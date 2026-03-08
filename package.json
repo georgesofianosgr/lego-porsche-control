@@ -1,0 +1,21 @@
+{
+  "name": "lego-porsche-node-mvp",
+  "version": "0.1.0",
+  "description": "Node.js MVP to control LEGO Technic Porsche Move Hub with keyboard and gamepad",
+  "type": "module",
+  "main": "src/index.js",
+  "bin": {
+    "lego-porsche-node": "src/index.js"
+  },
+  "scripts": {
+    "start": "node src/index.js",
+    "scan": "node src/index.js scan",
+    "connect-test": "node src/index.js connect-test",
+    "interactive": "node src/index.js interactive"
+  },
+  "dependencies": {
+    "@abandonware/noble": "^1.9.2-26",
+    "commander": "^12.1.0",
+    "node-gamepad": "^0.1.15"
+  }
+}
