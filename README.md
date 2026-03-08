@@ -2,6 +2,11 @@
 
 Node.js port of the Python MVP for LEGO Technic 42176 Porsche Move Hub.
 
+## Upstream reference
+
+This project is based on:
+- https://github.com/DanieleBenedettelli/TechnicMoveHub
+
 ## Features
 
 - Connect to hub over BLE

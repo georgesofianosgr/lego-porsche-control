@@ -11,11 +11,14 @@
     "start": "node src/index.js",
     "scan": "node src/index.js scan",
     "connect-test": "node src/index.js connect-test",
-    "interactive": "node src/index.js interactive"
+    "interactive": "node src/index.js interactive",
+    "sdl-app": "node src/sdl-app.js"
   },
   "dependencies": {
     "@abandonware/noble": "^1.9.2-26",
     "commander": "^12.1.0",
-    "node-gamepad": "^0.1.15"
+    "node-gamepad": "^0.1.15",
+    "@kmamal/sdl": "^0.11.6",
+    "@napi-rs/canvas": "^0.1.70"
   }
 }

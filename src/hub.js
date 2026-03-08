@@ -17,6 +17,7 @@ export class TechnicMoveHub {
     this.peripheral = null;
     this.characteristic = null;
     this.connectedAddress = null;
+    this.connectedName = null;
   }
 
   static clamp(value, low = -100, high = 100) {
@@ -108,6 +109,7 @@ export class TechnicMoveHub {
 
   async connect({ timeout = 5, address = null }) {
     this.connectedAddress = null;
+    this.connectedName = null;
     const peripherals = await this.scan({ timeout });
 
     for (const peripheral of peripherals) {
@@ -136,6 +138,7 @@ export class TechnicMoveHub {
         this.peripheral = peripheral;
         this.characteristic = characteristics[0];
         this.connectedAddress = peripheralAddress;
+        this.connectedName = peripheral?.advertisement?.localName || null;
         return true;
       } catch {
         try {
@@ -160,6 +163,7 @@ export class TechnicMoveHub {
     } finally {
       this.peripheral = null;
       this.characteristic = null;
+      this.connectedName = null;
     }
   }
 
