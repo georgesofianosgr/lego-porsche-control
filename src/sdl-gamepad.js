@@ -2,8 +2,10 @@ export function createGamepadMonitor(sdl, handlers) {
   let controller = null;
 
   // SDL controller names are xbox-style across devices.
-  // DualSense: CROSS -> a, OPTIONS -> start, PS -> guide.
-  const retryButtons = new Set(['a']);
+  // DualSense: CROSS -> a, SQUARE -> x, TRIANGLE -> y, OPTIONS -> start, PS -> guide.
+  const retryButtons = new Set(['y']);
+  const speedUpButtons = new Set(['a']);
+  const speedDownButtons = new Set(['x']);
   const exitButtons = new Set(['start', 'guide', 'back']);
 
   const state = {
@@ -73,6 +75,14 @@ export function createGamepadMonitor(sdl, handlers) {
 
       if (retryButtons.has(name)) {
         handlers.onRetry?.();
+        return;
+      }
+      if (speedUpButtons.has(name)) {
+        handlers.onSpeedUp?.();
+        return;
+      }
+      if (speedDownButtons.has(name)) {
+        handlers.onSpeedDown?.();
         return;
       }
 

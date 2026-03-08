@@ -9,11 +9,14 @@ import { createPorscheConnection } from './porsche-connection.js';
 
 const REFRESH_MS = 100;
 const CONTROL_MS = 50;
-const MAX_SPEED = 85;
+const CONNECTION_TIMEOUT_SECONDS = 15;
 const STEER_MAX = 100;
 const LIGHTS_ON = 0x00;
 const TRIGGER_DEADZONE = 0.06;
-const KEYBOARD_SPEED = 65;
+const DEFAULT_SPEED = 85;
+const SPEED_STEP = 25;
+const SPEED_MIN = 0;
+const SPEED_MAX = 100;
 const KEYBOARD_ANGLE = 70;
 const DRIVE_HEARTBEAT_MS = 180;
 
@@ -24,6 +27,14 @@ let connectInFlight = false;
 let renderInterval = null;
 let controlInterval = null;
 let lastDriveSentAt = 0;
+const triggerMode = {
+  leftIsSigned: false,
+  rightIsSigned: false,
+};
+const triggerRange = {
+  left: { min: 1, max: 0 },
+  right: { min: 1, max: 0 },
+};
 
 const appState = {
   gamepad: {
@@ -44,7 +55,7 @@ const appState = {
     status: 'Disconnected',
     name: null,
     address: null,
-    timeoutSeconds: 8,
+    timeoutSeconds: CONNECTION_TIMEOUT_SECONDS,
     remainingSeconds: null,
     lastError: null,
   },
@@ -52,6 +63,7 @@ const appState = {
     speed: 0,
     angle: 0,
     lights: LIGHTS_ON,
+    selectedSpeed: DEFAULT_SPEED,
   },
   keyboard: {
     w: false,
@@ -61,7 +73,7 @@ const appState = {
   },
 };
 
-const porsche = createPorscheConnection({ timeoutSeconds: 8 });
+const porsche = createPorscheConnection({ timeoutSeconds: CONNECTION_TIMEOUT_SECONDS });
 
 async function retryConnect() {
   if (connectInFlight || exiting) return;
@@ -79,38 +91,64 @@ function clampUnit(value) {
   return Math.max(-1, Math.min(1, Number(value) || 0));
 }
 
+function clamp01(value) {
+  return Math.max(0, Math.min(1, Number(value) || 0));
+}
+
 function applyDeadzone(value, deadzone) {
   const v = clampUnit(value);
   return Math.abs(v) < deadzone ? 0 : v;
 }
 
-function normalizeTrigger(value) {
+function normalizeTrigger(value, isSignedMode) {
   const v = Number(value) || 0;
-  if (v >= 0 && v <= 1) return v;
-  return clampUnit((v + 1) / 2);
+  if (isSignedMode) {
+    return clamp01((v + 1) / 2);
+  }
+  return clamp01(v);
+}
+
+function updateTriggerRange(stats, raw) {
+  if (!Number.isFinite(raw)) return;
+  if (raw < stats.min) stats.min = raw;
+  if (raw > stats.max) stats.max = raw;
+}
+
+function scaleTriggerByRange(raw, stats) {
+  const range = stats.max - stats.min;
+  if (!Number.isFinite(range) || range < 0.08) {
+    // Not enough calibration yet; keep raw behavior.
+    return raw;
+  }
+  return clamp01((raw - stats.min) / range);
 }
 
 function computeDriveFromGamepad(gamepad) {
   const steer = clampUnit(gamepad.leftStickX);
-  const forwardAxis = normalizeTrigger(gamepad.rightTrigger);
-  const reverseAxis = normalizeTrigger(gamepad.leftTrigger);
+  const forwardRaw = normalizeTrigger(gamepad.rightTrigger, triggerMode.rightIsSigned);
+  const reverseRaw = normalizeTrigger(gamepad.leftTrigger, triggerMode.leftIsSigned);
+  const forwardAxis = scaleTriggerByRange(forwardRaw, triggerRange.right);
+  const reverseAxis = scaleTriggerByRange(reverseRaw, triggerRange.left);
   const forwardDigital = gamepad.rightShoulder ? 1 : 0;
   const reverseDigital = gamepad.leftShoulder ? 1 : 0;
   const forward = Math.max(forwardAxis, forwardDigital);
   const reverse = Math.max(reverseAxis, reverseDigital);
   const throttle = applyDeadzone(forward - reverse, TRIGGER_DEADZONE);
+  const speedScale = appState.control.selectedSpeed / 100;
 
   return {
-    speed: Math.round(throttle * MAX_SPEED),
+    speed: Math.round(throttle * 100 * speedScale),
     angle: Math.round(steer * STEER_MAX),
     lights: LIGHTS_ON,
   };
 }
 
 function computeDriveFromKeyboard(keyboard) {
+  const speedScale = appState.control.selectedSpeed / 100;
+  const keyboardSpeed = Math.round(100 * speedScale);
   let speed = 0;
-  if (keyboard.w && !keyboard.s) speed = KEYBOARD_SPEED;
-  if (keyboard.s && !keyboard.w) speed = -KEYBOARD_SPEED;
+  if (keyboard.w && !keyboard.s) speed = keyboardSpeed;
+  if (keyboard.s && !keyboard.w) speed = -keyboardSpeed;
 
   let angle = 0;
   if (keyboard.a && !keyboard.d) angle = -KEYBOARD_ANGLE;
@@ -156,10 +194,35 @@ const gamepadMonitor = createGamepadMonitor(sdl, {
   onRetry: () => {
     void retryConnect();
   },
+  onSpeedUp: () => {
+    appState.control.selectedSpeed = Math.min(
+      SPEED_MAX,
+      appState.control.selectedSpeed + SPEED_STEP,
+    );
+  },
+  onSpeedDown: () => {
+    appState.control.selectedSpeed = Math.max(
+      SPEED_MIN,
+      appState.control.selectedSpeed - SPEED_STEP,
+    );
+  },
   onExit: () => {
     void exit();
   },
   onChange: (next) => {
+    if (Number(next.leftTrigger) < -0.05) triggerMode.leftIsSigned = true;
+    if (Number(next.rightTrigger) < -0.05) triggerMode.rightIsSigned = true;
+    if (!next.connected) {
+      triggerRange.left.min = 1;
+      triggerRange.left.max = 0;
+      triggerRange.right.min = 1;
+      triggerRange.right.max = 0;
+    } else {
+      const leftRaw = normalizeTrigger(next.leftTrigger, triggerMode.leftIsSigned);
+      const rightRaw = normalizeTrigger(next.rightTrigger, triggerMode.rightIsSigned);
+      updateTriggerRange(triggerRange.left, leftRaw);
+      updateTriggerRange(triggerRange.right, rightRaw);
+    }
     appState.gamepad = next;
   },
 });
@@ -182,7 +245,7 @@ controlInterval = setInterval(() => {
   const next = hasKeyboardDriveInput(appState.keyboard)
     ? computeDriveFromKeyboard(appState.keyboard)
     : computeDriveFromGamepad(appState.gamepad);
-  appState.control = next;
+  appState.control = { ...next, selectedSpeed: appState.control.selectedSpeed };
 
   if (
     next.speed === lastSent.speed &&

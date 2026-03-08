@@ -68,7 +68,7 @@ export function createGraphics() {
     ctx.font = '16px Menlo';
     ctx.fillStyle = MUTED;
     ctx.fillText('Keyboard: WASD = Drive | ESC = Exit | R = Retry Connect', 32, 80);
-    ctx.fillText('PlayStation: L2/R2 = Reverse/Throttle | OPTIONS/PS = Exit | CROSS (X) = Retry', 32, 102);
+    ctx.fillText('PlayStation: L2/R2 = Reverse/Throttle | X(CROSS)=Speed+ | Square=Speed- | Triangle=Retry', 32, 102);
 
     const panelX = 24;
     const panelY = 126;
@@ -125,6 +125,7 @@ export function createGraphics() {
       `Keyboard WASD: ${uiState.keyboard.w ? 'W' : '-'}${uiState.keyboard.a ? 'A' : '-'}${
         uiState.keyboard.s ? 'S' : '-'
       }${uiState.keyboard.d ? 'D' : '-'}`,
+      `Selected speed: ${uiState.control.selectedSpeed}% (min 0, max 100)`,
       `Last error: ${uiState.hub.lastError || '(none)'}`,
       `Command speed/angle: ${uiState.control.speed} / ${uiState.control.angle}`,
     ]);
