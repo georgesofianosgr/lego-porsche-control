@@ -1,12 +1,9 @@
 export function createGamepadMonitor(sdl, handlers) {
   let controller = null;
 
-  // SDL controller names are xbox-style across devices.
-  // DualSense: CROSS -> a, SQUARE -> x, TRIANGLE -> y, OPTIONS -> start, PS -> guide.
-  const retryButtons = new Set(['y']);
-  const speedUpButtons = new Set(['a']);
-  const speedDownButtons = new Set(['x']);
-  const exitButtons = new Set(['start', 'guide', 'back']);
+  const menuButtons = new Set(['start', 'guide', 'back']);
+  const primaryButtons = new Set(['a']); // DualSense CROSS
+  const secondaryButtons = new Set(['x']); // DualSense SQUARE
 
   const state = {
     connected: false,
@@ -27,13 +24,26 @@ export function createGamepadMonitor(sdl, handlers) {
     handlers.onChange?.({ ...state });
   };
 
+  const resetState = () => {
+    state.connected = false;
+    state.name = null;
+    state.type = null;
+    state.lastButton = null;
+    state.leftStickX = 0;
+    state.leftStickY = 0;
+    state.rightStickX = 0;
+    state.rightStickY = 0;
+    state.leftTrigger = 0;
+    state.rightTrigger = 0;
+    state.leftShoulder = false;
+    state.rightShoulder = false;
+  };
+
   const tryOpen = () => {
     if (controller) return;
     const device = sdl.controller.devices[0] || null;
     if (!device) {
-      state.connected = false;
-      state.name = null;
-      state.type = null;
+      resetState();
       emitState();
       return;
     }
@@ -65,31 +75,34 @@ export function createGamepadMonitor(sdl, handlers) {
     controller.on('buttonDown', (event) => {
       const name = String(event?.button || '').toLowerCase();
       state.lastButton = name || null;
+
       if (name === 'leftshoulder') state.leftShoulder = true;
       if (name === 'rightshoulder') state.rightShoulder = true;
-      emitState();
-
       if (name === 'lefttrigger') state.leftTrigger = 1;
       if (name === 'righttrigger') state.rightTrigger = 1;
       emitState();
 
-      if (retryButtons.has(name)) {
-        handlers.onRetry?.();
+      if (menuButtons.has(name)) {
+        handlers.onMenuToggle?.();
         return;
       }
-      if (speedUpButtons.has(name)) {
-        handlers.onSpeedUp?.();
+      if (name === 'dpadup') {
+        handlers.onMenuUp?.();
         return;
       }
-      if (speedDownButtons.has(name)) {
-        handlers.onSpeedDown?.();
+      if (name === 'dpaddown') {
+        handlers.onMenuDown?.();
         return;
       }
-
-      if (exitButtons.has(name)) {
-        handlers.onExit?.();
+      if (primaryButtons.has(name)) {
+        handlers.onPrimaryAction?.();
+        return;
+      }
+      if (secondaryButtons.has(name)) {
+        handlers.onSecondaryAction?.();
       }
     });
+
     controller.on('buttonUp', (event) => {
       const name = String(event?.button || '').toLowerCase();
       if (name === 'leftshoulder') state.leftShoulder = false;
@@ -101,18 +114,7 @@ export function createGamepadMonitor(sdl, handlers) {
 
     controller.on('close', () => {
       controller = null;
-      state.connected = false;
-      state.name = null;
-      state.type = null;
-      state.lastButton = null;
-      state.leftStickX = 0;
-      state.leftStickY = 0;
-      state.rightStickX = 0;
-      state.rightStickY = 0;
-      state.leftTrigger = 0;
-      state.rightTrigger = 0;
-      state.leftShoulder = false;
-      state.rightShoulder = false;
+      resetState();
       emitState();
     });
   };
@@ -123,26 +125,12 @@ export function createGamepadMonitor(sdl, handlers) {
 
   const onDeviceRemove = () => {
     if (!sdl.controller.devices.length) {
-      if (controller && !controller.closed) {
-        controller.close();
-      }
+      if (controller && !controller.closed) controller.close();
       controller = null;
-      state.connected = false;
-      state.name = null;
-      state.type = null;
-      state.lastButton = null;
-      state.leftStickX = 0;
-      state.leftStickY = 0;
-      state.rightStickX = 0;
-      state.rightStickY = 0;
-      state.leftTrigger = 0;
-      state.rightTrigger = 0;
-      state.leftShoulder = false;
-      state.rightShoulder = false;
+      resetState();
       emitState();
       return;
     }
-
     if (controller && !controller.closed) return;
     tryOpen();
   };
@@ -154,9 +142,7 @@ export function createGamepadMonitor(sdl, handlers) {
   const dispose = () => {
     sdl.controller.off('deviceAdd', onDeviceAdd);
     sdl.controller.off('deviceRemove', onDeviceRemove);
-    if (controller && !controller.closed) {
-      controller.close();
-    }
+    if (controller && !controller.closed) controller.close();
   };
 
   return {

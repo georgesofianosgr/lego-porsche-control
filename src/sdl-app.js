@@ -13,24 +13,31 @@ const CONNECTION_TIMEOUT_SECONDS = 15;
 const STEER_MAX = 100;
 const LIGHTS_ON = 0x00;
 const TRIGGER_DEADZONE = 0.06;
-const DEFAULT_SPEED = 85;
+const DEFAULT_SPEED = 100;
 const SPEED_STEP = 25;
 const SPEED_MIN = 0;
 const SPEED_MAX = 100;
 const KEYBOARD_ANGLE = 70;
 const DRIVE_HEARTBEAT_MS = 180;
 
+const SCREEN_INITIAL = 'initial';
+const SCREEN_DRIVE = 'drive';
+const SCREEN_MENU = 'menu';
+
 const graphics = createGraphics();
+const porsche = createPorscheConnection({ timeoutSeconds: CONNECTION_TIMEOUT_SECONDS });
 
 let exiting = false;
 let connectInFlight = false;
 let renderInterval = null;
 let controlInterval = null;
 let lastDriveSentAt = 0;
+
 const triggerMode = {
   leftIsSigned: false,
   rightIsSigned: false,
 };
+
 const triggerRange = {
   left: { min: 1, max: 0 },
   right: { min: 1, max: 0 },
@@ -71,28 +78,23 @@ const appState = {
     s: false,
     d: false,
   },
+  ui: {
+    screen: SCREEN_INITIAL,
+    previousScreen: SCREEN_INITIAL,
+    menuIndex: 0,
+  },
 };
 
-const porsche = createPorscheConnection({ timeoutSeconds: CONNECTION_TIMEOUT_SECONDS });
-
-async function retryConnect() {
-  if (connectInFlight || exiting) return;
-  connectInFlight = true;
-  appState.hub = porsche.getState();
-
-  try {
-    appState.hub = await porsche.connect();
-  } finally {
-    connectInFlight = false;
-  }
+function clamp(value, min, max) {
+  return Math.max(min, Math.min(max, Number(value) || 0));
 }
 
 function clampUnit(value) {
-  return Math.max(-1, Math.min(1, Number(value) || 0));
+  return clamp(value, -1, 1);
 }
 
 function clamp01(value) {
-  return Math.max(0, Math.min(1, Number(value) || 0));
+  return clamp(value, 0, 1);
 }
 
 function applyDeadzone(value, deadzone) {
@@ -102,9 +104,7 @@ function applyDeadzone(value, deadzone) {
 
 function normalizeTrigger(value, isSignedMode) {
   const v = Number(value) || 0;
-  if (isSignedMode) {
-    return clamp01((v + 1) / 2);
-  }
+  if (isSignedMode) return clamp01((v + 1) / 2);
   return clamp01(v);
 }
 
@@ -116,11 +116,12 @@ function updateTriggerRange(stats, raw) {
 
 function scaleTriggerByRange(raw, stats) {
   const range = stats.max - stats.min;
-  if (!Number.isFinite(range) || range < 0.08) {
-    // Not enough calibration yet; keep raw behavior.
-    return raw;
-  }
+  if (!Number.isFinite(range) || range < 0.08) return raw;
   return clamp01((raw - stats.min) / range);
+}
+
+function hasKeyboardDriveInput(keyboard) {
+  return keyboard.w || keyboard.a || keyboard.s || keyboard.d;
 }
 
 function computeDriveFromGamepad(gamepad) {
@@ -146,6 +147,7 @@ function computeDriveFromGamepad(gamepad) {
 function computeDriveFromKeyboard(keyboard) {
   const speedScale = appState.control.selectedSpeed / 100;
   const keyboardSpeed = Math.round(100 * speedScale);
+
   let speed = 0;
   if (keyboard.w && !keyboard.s) speed = keyboardSpeed;
   if (keyboard.s && !keyboard.w) speed = -keyboardSpeed;
@@ -157,8 +159,90 @@ function computeDriveFromKeyboard(keyboard) {
   return { speed, angle, lights: LIGHTS_ON };
 }
 
-function hasKeyboardDriveInput(keyboard) {
-  return keyboard.w || keyboard.a || keyboard.s || keyboard.d;
+function syncMainScreenWithConnection() {
+  if (appState.ui.screen === SCREEN_MENU) return;
+  const target = appState.hub.status === 'Connected' ? SCREEN_DRIVE : SCREEN_INITIAL;
+  appState.ui.screen = target;
+  appState.ui.previousScreen = target;
+}
+
+function toggleMenu() {
+  if (appState.ui.screen === SCREEN_MENU) {
+    appState.ui.screen = appState.ui.previousScreen;
+    return;
+  }
+  appState.ui.previousScreen = appState.ui.screen;
+  appState.ui.menuIndex = 0;
+  appState.ui.screen = SCREEN_MENU;
+}
+
+function adjustSelectedSpeed(delta) {
+  appState.control.selectedSpeed = clamp(
+    appState.control.selectedSpeed + delta,
+    SPEED_MIN,
+    SPEED_MAX,
+  );
+}
+
+async function retryConnect() {
+  if (connectInFlight || exiting || appState.hub.status === 'Connected') return;
+  connectInFlight = true;
+  appState.hub = porsche.getState();
+  try {
+    appState.hub = await porsche.connect();
+  } finally {
+    connectInFlight = false;
+  }
+}
+
+async function disconnectPorsche() {
+  await porsche.stop({ lights: LIGHTS_ON });
+  await porsche.disconnect();
+  appState.hub = porsche.getState();
+}
+
+async function runMenuSelection() {
+  if (appState.ui.menuIndex === 0) {
+    await disconnectPorsche();
+    appState.ui.screen = SCREEN_INITIAL;
+    appState.ui.previousScreen = SCREEN_INITIAL;
+    return;
+  }
+  if (appState.ui.menuIndex === 1) {
+    await exit();
+  }
+}
+
+function onPrimaryAction() {
+  if (appState.ui.screen === SCREEN_MENU) {
+    void runMenuSelection();
+    return;
+  }
+
+  if (appState.ui.screen === SCREEN_INITIAL) {
+    void retryConnect();
+    return;
+  }
+
+  if (appState.ui.screen === SCREEN_DRIVE) {
+    adjustSelectedSpeed(SPEED_STEP);
+  }
+}
+
+function onSecondaryAction() {
+  if (appState.ui.screen === SCREEN_DRIVE) {
+    adjustSelectedSpeed(-SPEED_STEP);
+  }
+}
+
+function onMenuUp() {
+  if (appState.ui.screen !== SCREEN_MENU) return;
+  appState.ui.menuIndex = appState.ui.menuIndex > 0 ? appState.ui.menuIndex - 1 : 1;
+}
+
+function onMenuDown() {
+  if (appState.ui.screen !== SCREEN_MENU) return;
+  appState.ui.menuIndex = appState.ui.menuIndex < 1 ? appState.ui.menuIndex + 1 : 0;
 }
 
 async function exit() {
@@ -182,36 +266,35 @@ const cleanupKeyboard = registerKeyboard(graphics.window, {
   onExit: () => {
     void exit();
   },
-  onRetry: () => {
-    void retryConnect();
+  onMenuToggle: () => {
+    toggleMenu();
   },
+  onMenuUp,
+  onMenuDown,
+  onMenuSelect: () => {
+    if (appState.ui.screen === SCREEN_MENU) {
+      void runMenuSelection();
+    }
+  },
+  onPrimaryAction,
+  onSecondaryAction,
   onDriveChange: (next) => {
     appState.keyboard = next;
   },
 });
 
 const gamepadMonitor = createGamepadMonitor(sdl, {
-  onRetry: () => {
-    void retryConnect();
+  onMenuToggle: () => {
+    toggleMenu();
   },
-  onSpeedUp: () => {
-    appState.control.selectedSpeed = Math.min(
-      SPEED_MAX,
-      appState.control.selectedSpeed + SPEED_STEP,
-    );
-  },
-  onSpeedDown: () => {
-    appState.control.selectedSpeed = Math.max(
-      SPEED_MIN,
-      appState.control.selectedSpeed - SPEED_STEP,
-    );
-  },
-  onExit: () => {
-    void exit();
-  },
+  onMenuUp,
+  onMenuDown,
+  onPrimaryAction,
+  onSecondaryAction,
   onChange: (next) => {
     if (Number(next.leftTrigger) < -0.05) triggerMode.leftIsSigned = true;
     if (Number(next.rightTrigger) < -0.05) triggerMode.rightIsSigned = true;
+
     if (!next.connected) {
       triggerRange.left.min = 1;
       triggerRange.left.max = 0;
@@ -223,6 +306,7 @@ const gamepadMonitor = createGamepadMonitor(sdl, {
       updateTriggerRange(triggerRange.left, leftRaw);
       updateTriggerRange(triggerRange.right, rightRaw);
     }
+
     appState.gamepad = next;
   },
 });
@@ -234,6 +318,7 @@ graphics.window.on('close', () => {
 renderInterval = setInterval(() => {
   if (exiting) return;
   appState.hub = porsche.getState();
+  syncMainScreenWithConnection();
   graphics.render(appState);
 }, REFRESH_MS);
 
@@ -242,9 +327,13 @@ controlInterval = setInterval(() => {
   if (exiting) return;
   if (appState.hub.status !== 'Connected') return;
 
-  const next = hasKeyboardDriveInput(appState.keyboard)
-    ? computeDriveFromKeyboard(appState.keyboard)
-    : computeDriveFromGamepad(appState.gamepad);
+  let next = { speed: 0, angle: 0, lights: LIGHTS_ON };
+  if (appState.ui.screen === SCREEN_DRIVE) {
+    next = hasKeyboardDriveInput(appState.keyboard)
+      ? computeDriveFromKeyboard(appState.keyboard)
+      : computeDriveFromGamepad(appState.gamepad);
+  }
+
   appState.control = { ...next, selectedSpeed: appState.control.selectedSpeed };
 
   if (
@@ -262,5 +351,4 @@ controlInterval = setInterval(() => {
   void porsche.drive(next);
 }, CONTROL_MS);
 
-await retryConnect();
 graphics.render(appState);

@@ -1,57 +1,65 @@
 export function registerKeyboard(window, handlers) {
-  const keyState = {
-    w: false,
-    a: false,
-    s: false,
-    d: false,
-  };
+  const keyState = { w: false, a: false, s: false, d: false };
 
   const emitDriveState = () => {
     handlers.onDriveChange?.({ ...keyState });
   };
 
+  const setDriveKey = (key, isDown) => {
+    if (keyState[key] === isDown) return;
+    keyState[key] = isDown;
+    emitDriveState();
+  };
+
   const onKeyDown = (event) => {
     const key = String(event?.key || '').toLowerCase();
+
     if (key === 'escape') {
       handlers.onExit?.();
       return;
     }
-    if (key === 'r' || key === 'R' || event?.scancode === 21) {
-      handlers.onRetry?.();
+    if (key === 'm') {
+      handlers.onMenuToggle?.();
       return;
     }
-    if (key === 'w' || key === 'a' || key === 's' || key === 'd') {
-      if (!keyState[key]) {
-        keyState[key] = true;
-        emitDriveState();
-      }
+    if (key === 'x') {
+      handlers.onPrimaryAction?.();
+      return;
     }
-  };
+    if (key === 'z') {
+      handlers.onSecondaryAction?.();
+      return;
+    }
+    if (key === 'up') {
+      handlers.onMenuUp?.();
+      return;
+    }
+    if (key === 'down') {
+      handlers.onMenuDown?.();
+      return;
+    }
+    if (key === 'return' || key === 'enter') {
+      handlers.onMenuSelect?.();
+      return;
+    }
 
-  const onTextInput = (event) => {
-    const text = String(event?.text || '').toLowerCase();
-    if (text === 'r') {
-      handlers.onRetry?.();
+    if (key === 'w' || key === 'a' || key === 's' || key === 'd') {
+      setDriveKey(key, true);
     }
   };
 
   const onKeyUp = (event) => {
     const key = String(event?.key || '').toLowerCase();
     if (key === 'w' || key === 'a' || key === 's' || key === 'd') {
-      if (keyState[key]) {
-        keyState[key] = false;
-        emitDriveState();
-      }
+      setDriveKey(key, false);
     }
   };
 
   window.on('keyDown', onKeyDown);
-  window.on('textInput', onTextInput);
   window.on('keyUp', onKeyUp);
 
   return () => {
     window.off('keyDown', onKeyDown);
-    window.off('textInput', onTextInput);
     window.off('keyUp', onKeyUp);
   };
 }
