@@ -5,8 +5,10 @@ import { renderDriveScreen } from './screens/drive-screen.js';
 import { renderMenuScreen } from './screens/menu-screen.js';
 import { renderGamepadScreen } from './screens/gamepad-screen.js';
 
-const WINDOW_WIDTH = 920;
-const WINDOW_HEIGHT = 520;
+const WINDOW_WIDTH = 1280;
+const WINDOW_HEIGHT = 720;
+const INTERNAL_WIDTH = 1920;
+const INTERNAL_HEIGHT = 1080;
 const BG = '#0f172a';
 const FG = '#e5e7eb';
 const MUTED = '#94a3b8';
@@ -58,19 +60,20 @@ export function createGraphics() {
   window.on('resize', resizeHandler);
 
   const render = (state) => {
-    const canvas = createCanvas(size.width, size.height);
+    // Render everything in fixed 1080p, then let SDL scale to window/fullscreen.
+    const canvas = createCanvas(INTERNAL_WIDTH, INTERNAL_HEIGHT);
     const ctx = canvas.getContext('2d');
 
     ctx.fillStyle = BG;
-    ctx.fillRect(0, 0, size.width, size.height);
+    ctx.fillRect(0, 0, INTERNAL_WIDTH, INTERNAL_HEIGHT);
 
-    drawTopBar(ctx, size.width, state);
+    drawTopBar(ctx, INTERNAL_WIDTH, state);
 
     const layout = {
       panelX: 24,
       panelY: 76,
-      panelW: size.width - 48,
-      panelH: size.height - 100,
+      panelW: INTERNAL_WIDTH - 48,
+      panelH: INTERNAL_HEIGHT - 100,
       FG,
       MUTED,
       OK,
@@ -88,8 +91,8 @@ export function createGraphics() {
       renderInitialScreen(ctx, layout, state);
     }
 
-    const data = ctx.getImageData(0, 0, size.width, size.height).data;
-    window.render(size.width, size.height, size.width * 4, 'rgba32', Buffer.from(data));
+    const data = ctx.getImageData(0, 0, INTERNAL_WIDTH, INTERNAL_HEIGHT).data;
+    window.render(INTERNAL_WIDTH, INTERNAL_HEIGHT, INTERNAL_WIDTH * 4, 'rgba32', Buffer.from(data));
     window.setTitle(`LEGO Porsche SDL | ${state.ui.screen.toUpperCase()}`);
   };
 
@@ -98,5 +101,11 @@ export function createGraphics() {
     window.destroy();
   };
 
-  return { window, render, dispose };
+  const setFullscreen = (enabled) => {
+    window.setFullscreen(Boolean(enabled));
+  };
+
+  const isFullscreen = () => Boolean(window.fullscreen);
+
+  return { window, render, dispose, setFullscreen, isFullscreen };
 }

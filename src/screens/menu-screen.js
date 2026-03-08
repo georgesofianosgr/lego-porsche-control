@@ -1,7 +1,11 @@
-const ITEMS = ['Disconnect', 'Choose Gamepad', 'Exit'];
-
 export function renderMenuScreen(ctx, layout, state) {
   const { panelX, panelY, panelW, panelH, FG, MUTED, OK } = layout;
+  const items = [
+    'Disconnect',
+    'Choose Gamepad',
+    `Toggle Fullscreen (${state.ui.isFullscreen ? 'On' : 'Off'})`,
+    'Exit',
+  ];
 
   ctx.fillStyle = '#111827';
   ctx.fillRect(panelX, panelY, panelW, panelH);
@@ -19,11 +23,11 @@ export function renderMenuScreen(ctx, layout, state) {
   ctx.fillText('Use D-Pad Up/Down (or keyboard arrows) and primary action to select', x, y);
   y += 44;
 
-  for (let i = 0; i < ITEMS.length; i += 1) {
+  for (let i = 0; i < items.length; i += 1) {
     const selected = state.ui.menuIndex === i;
     ctx.fillStyle = selected ? OK : FG;
     ctx.font = selected ? 'bold 24px Menlo' : '20px Menlo';
-    ctx.fillText(`${selected ? '>' : ' '} ${ITEMS[i]}`, x, y);
+    ctx.fillText(`${selected ? '>' : ' '} ${items[i]}`, x, y);
     y += 38;
   }
 }

@@ -99,6 +99,7 @@ const appState = {
     previousScreen: SCREEN_INITIAL,
     menuIndex: 0,
     mockMode: useMock,
+    isFullscreen: false,
   },
   mock: {
     porsche: null,
@@ -196,6 +197,12 @@ function toggleMenu() {
   appState.ui.screen = SCREEN_MENU;
 }
 
+function toggleFullscreen() {
+  const next = !appState.ui.isFullscreen;
+  graphics.setFullscreen(next);
+  appState.ui.isFullscreen = graphics.isFullscreen();
+}
+
 function adjustSelectedSpeed(delta) {
   appState.control.selectedSpeed = clamp(
     appState.control.selectedSpeed + delta,
@@ -234,6 +241,10 @@ async function runMenuSelection() {
     return;
   }
   if (appState.ui.menuIndex === 2) {
+    toggleFullscreen();
+    return;
+  }
+  if (appState.ui.menuIndex === 3) {
     await exit();
   }
 }
@@ -284,7 +295,7 @@ function onSecondaryAction() {
 
 function onMenuUp() {
   if (appState.ui.screen === SCREEN_MENU) {
-    appState.ui.menuIndex = appState.ui.menuIndex > 0 ? appState.ui.menuIndex - 1 : 2;
+    appState.ui.menuIndex = appState.ui.menuIndex > 0 ? appState.ui.menuIndex - 1 : 3;
     return;
   }
   if (appState.ui.screen === SCREEN_GAMEPAD) {
@@ -294,7 +305,7 @@ function onMenuUp() {
 
 function onMenuDown() {
   if (appState.ui.screen === SCREEN_MENU) {
-    appState.ui.menuIndex = appState.ui.menuIndex < 2 ? appState.ui.menuIndex + 1 : 0;
+    appState.ui.menuIndex = appState.ui.menuIndex < 3 ? appState.ui.menuIndex + 1 : 0;
     return;
   }
   if (appState.ui.screen === SCREEN_GAMEPAD) {
