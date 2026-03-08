@@ -1,4 +1,4 @@
-const ITEMS = ['Disconnect', 'Exit'];
+const ITEMS = ['Disconnect', 'Choose Gamepad', 'Exit'];
 
 export function renderMenuScreen(ctx, layout, state) {
   const { panelX, panelY, panelW, panelH, FG, MUTED, OK } = layout;
@@ -16,7 +16,7 @@ export function renderMenuScreen(ctx, layout, state) {
 
   ctx.fillStyle = MUTED;
   ctx.font = '16px Menlo';
-  ctx.fillText('Use D-Pad Up/Down (or keyboard arrows) and X to select', x, y);
+  ctx.fillText('Use D-Pad Up/Down (or keyboard arrows) and primary action to select', x, y);
   y += 44;
 
   for (let i = 0; i < ITEMS.length; i += 1) {

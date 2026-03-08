@@ -1,6 +1,8 @@
 export function renderInitialScreen(ctx, layout, state) {
   const { panelX, panelY, panelW, panelH, FG, MUTED, WARN, ERR, OK } = layout;
   const hub = state.hub;
+  const primary = state.gamepad.profile.primary;
+  const secondary = state.gamepad.profile.secondary;
 
   ctx.fillStyle = '#111827';
   ctx.fillRect(panelX, panelY, panelW, panelH);
@@ -40,12 +42,12 @@ export function renderInitialScreen(ctx, layout, state) {
 
     ctx.fillStyle = OK;
     ctx.font = 'bold 24px Menlo';
-    ctx.fillText('Press X to Connect', centerX, y);
+    ctx.fillText(`Press ${primary} to Connect`, centerX, y);
     y += 40;
 
     ctx.fillStyle = MUTED;
     ctx.font = '16px Menlo';
-    ctx.fillText('Keyboard: X to connect', centerX, y);
+    ctx.fillText(`Press ${secondary} to Choose Gamepad | Keyboard: X connect, G gamepad`, centerX, y);
   }
 
   ctx.textAlign = 'left';

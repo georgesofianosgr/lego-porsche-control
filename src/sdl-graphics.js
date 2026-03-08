@@ -3,6 +3,7 @@ import { createCanvas } from '@napi-rs/canvas';
 import { renderInitialScreen } from './screens/initial-screen.js';
 import { renderDriveScreen } from './screens/drive-screen.js';
 import { renderMenuScreen } from './screens/menu-screen.js';
+import { renderGamepadScreen } from './screens/gamepad-screen.js';
 
 const WINDOW_WIDTH = 920;
 const WINDOW_HEIGHT = 520;
@@ -22,7 +23,8 @@ function drawTopBar(ctx, width, state) {
   ctx.font = 'bold 28px Menlo';
   ctx.fillText('LEGO Porsche', 32, 48);
 
-  const hint = state.ui.screen === 'menu' ? 'OPTIONS: Back' : 'OPTIONS: Menu';
+  const menuLabel = state?.gamepad?.profile?.menu || 'Options';
+  const hint = state.ui.screen === 'menu' ? `${menuLabel}: Back` : `${menuLabel}: Menu`;
   ctx.font = '16px Menlo';
   ctx.fillStyle = MUTED;
   const textWidth = ctx.measureText(hint).width;
@@ -78,6 +80,8 @@ export function createGraphics() {
 
     if (state.ui.screen === 'menu') {
       renderMenuScreen(ctx, layout, state);
+    } else if (state.ui.screen === 'gamepad') {
+      renderGamepadScreen(ctx, layout, state);
     } else if (state.ui.screen === 'drive') {
       renderDriveScreen(ctx, layout, state);
     } else {

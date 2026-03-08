@@ -24,6 +24,7 @@ const DRIVE_HEARTBEAT_MS = 180;
 const SCREEN_INITIAL = 'initial';
 const SCREEN_DRIVE = 'drive';
 const SCREEN_MENU = 'menu';
+const SCREEN_GAMEPAD = 'gamepad';
 const useMock = process.argv.includes('--mock');
 
 const graphics = createGraphics();
@@ -61,6 +62,17 @@ const appState = {
     rightTrigger: 0,
     leftShoulder: false,
     rightShoulder: false,
+    availableDevices: [],
+    selectedDeviceIndex: 0,
+    activeDeviceIndex: null,
+    profile: {
+      profile: 'xbox',
+      primary: 'A',
+      secondary: 'X',
+      menu: 'Menu',
+      menuAlt: 'Xbox',
+      dpad: 'D-Pad',
+    },
   },
   hub: {
     status: 'Disconnected',
@@ -168,7 +180,7 @@ function computeDriveFromKeyboard(keyboard) {
 }
 
 function syncMainScreenWithConnection() {
-  if (appState.ui.screen === SCREEN_MENU) return;
+  if (appState.ui.screen === SCREEN_MENU || appState.ui.screen === SCREEN_GAMEPAD) return;
   const target = appState.hub.status === 'Connected' ? SCREEN_DRIVE : SCREEN_INITIAL;
   appState.ui.screen = target;
   appState.ui.previousScreen = target;
@@ -217,13 +229,31 @@ async function runMenuSelection() {
     return;
   }
   if (appState.ui.menuIndex === 1) {
+    appState.ui.previousScreen = appState.ui.screen;
+    appState.ui.screen = SCREEN_GAMEPAD;
+    return;
+  }
+  if (appState.ui.menuIndex === 2) {
     await exit();
   }
+}
+
+function openGamepadScreen() {
+  if (appState.ui.screen === SCREEN_MENU) return;
+  appState.ui.previousScreen = appState.ui.screen;
+  appState.ui.screen = SCREEN_GAMEPAD;
 }
 
 function onPrimaryAction() {
   if (appState.ui.screen === SCREEN_MENU) {
     void runMenuSelection();
+    return;
+  }
+
+  if (appState.ui.screen === SCREEN_GAMEPAD) {
+    gamepadMonitor.activateSelectedDevice();
+    appState.ui.screen = appState.hub.status === 'Connected' ? SCREEN_DRIVE : SCREEN_INITIAL;
+    appState.ui.previousScreen = appState.ui.screen;
     return;
   }
 
@@ -238,19 +268,38 @@ function onPrimaryAction() {
 }
 
 function onSecondaryAction() {
+  if (appState.ui.screen === SCREEN_INITIAL) {
+    openGamepadScreen();
+    return;
+  }
+  if (appState.ui.screen === SCREEN_GAMEPAD) {
+    appState.ui.screen = appState.hub.status === 'Connected' ? SCREEN_DRIVE : SCREEN_INITIAL;
+    appState.ui.previousScreen = appState.ui.screen;
+    return;
+  }
   if (appState.ui.screen === SCREEN_DRIVE) {
     adjustSelectedSpeed(-SPEED_STEP);
   }
 }
 
 function onMenuUp() {
-  if (appState.ui.screen !== SCREEN_MENU) return;
-  appState.ui.menuIndex = appState.ui.menuIndex > 0 ? appState.ui.menuIndex - 1 : 1;
+  if (appState.ui.screen === SCREEN_MENU) {
+    appState.ui.menuIndex = appState.ui.menuIndex > 0 ? appState.ui.menuIndex - 1 : 2;
+    return;
+  }
+  if (appState.ui.screen === SCREEN_GAMEPAD) {
+    gamepadMonitor.selectPreviousDevice();
+  }
 }
 
 function onMenuDown() {
-  if (appState.ui.screen !== SCREEN_MENU) return;
-  appState.ui.menuIndex = appState.ui.menuIndex < 1 ? appState.ui.menuIndex + 1 : 0;
+  if (appState.ui.screen === SCREEN_MENU) {
+    appState.ui.menuIndex = appState.ui.menuIndex < 2 ? appState.ui.menuIndex + 1 : 0;
+    return;
+  }
+  if (appState.ui.screen === SCREEN_GAMEPAD) {
+    gamepadMonitor.selectNextDevice();
+  }
 }
 
 async function exit() {
@@ -282,6 +331,25 @@ const cleanupKeyboard = registerKeyboard(graphics.window, {
   onMenuSelect: () => {
     if (appState.ui.screen === SCREEN_MENU) {
       void runMenuSelection();
+      return;
+    }
+    if (appState.ui.screen === SCREEN_GAMEPAD) {
+      gamepadMonitor.activateSelectedDevice();
+      appState.ui.screen = appState.hub.status === 'Connected' ? SCREEN_DRIVE : SCREEN_INITIAL;
+      appState.ui.previousScreen = appState.ui.screen;
+    }
+  },
+  onGamepadScreen: () => {
+    openGamepadScreen();
+  },
+  onNavLeft: () => {
+    if (appState.ui.screen === SCREEN_GAMEPAD) {
+      gamepadMonitor.selectPreviousDevice();
+    }
+  },
+  onNavRight: () => {
+    if (appState.ui.screen === SCREEN_GAMEPAD) {
+      gamepadMonitor.selectNextDevice();
     }
   },
   onPrimaryAction,

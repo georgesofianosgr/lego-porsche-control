@@ -24,6 +24,8 @@ export function renderDriveScreen(ctx, layout, state) {
   y += 30;
   ctx.fillText(`Command angle: ${state.control.angle}`, x, y);
   y += 30;
+  ctx.fillText(`Controller profile: ${state.gamepad.profile.profile}`, x, y);
+  y += 30;
   ctx.fillText(`Gamepad: ${state.gamepad.name || '(not connected)'}`, x, y);
   y += 30;
   ctx.fillText(

@@ -30,12 +30,24 @@ export function registerKeyboard(window, handlers) {
       handlers.onSecondaryAction?.();
       return;
     }
+    if (key === 'g') {
+      handlers.onGamepadScreen?.();
+      return;
+    }
     if (key === 'up') {
       handlers.onMenuUp?.();
       return;
     }
     if (key === 'down') {
       handlers.onMenuDown?.();
+      return;
+    }
+    if (key === 'left') {
+      handlers.onNavLeft?.();
+      return;
+    }
+    if (key === 'right') {
+      handlers.onNavRight?.();
       return;
     }
     if (key === 'return' || key === 'enter') {
