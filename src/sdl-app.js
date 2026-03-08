@@ -6,6 +6,7 @@ import { createGraphics } from './sdl-graphics.js';
 import { registerKeyboard } from './sdl-keyboard.js';
 import { createGamepadMonitor } from './sdl-gamepad.js';
 import { createPorscheConnection } from './porsche-connection.js';
+import { createMockConnection } from './mocks/mock-connection.js';
 
 const REFRESH_MS = 100;
 const CONTROL_MS = 50;
@@ -23,9 +24,12 @@ const DRIVE_HEARTBEAT_MS = 180;
 const SCREEN_INITIAL = 'initial';
 const SCREEN_DRIVE = 'drive';
 const SCREEN_MENU = 'menu';
+const useMock = process.argv.includes('--mock');
 
 const graphics = createGraphics();
-const porsche = createPorscheConnection({ timeoutSeconds: CONNECTION_TIMEOUT_SECONDS });
+const porsche = useMock
+  ? createMockConnection({ timeoutSeconds: CONNECTION_TIMEOUT_SECONDS })
+  : createPorscheConnection({ timeoutSeconds: CONNECTION_TIMEOUT_SECONDS });
 
 let exiting = false;
 let connectInFlight = false;
@@ -82,6 +86,10 @@ const appState = {
     screen: SCREEN_INITIAL,
     previousScreen: SCREEN_INITIAL,
     menuIndex: 0,
+    mockMode: useMock,
+  },
+  mock: {
+    porsche: null,
   },
 };
 
@@ -318,6 +326,9 @@ graphics.window.on('close', () => {
 renderInterval = setInterval(() => {
   if (exiting) return;
   appState.hub = porsche.getState();
+  if (typeof porsche.getMockPorscheState === 'function') {
+    appState.mock.porsche = porsche.getMockPorscheState();
+  }
   syncMainScreenWithConnection();
   graphics.render(appState);
 }, REFRESH_MS);
