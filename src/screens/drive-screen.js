@@ -1,4 +1,5 @@
 import { drawBatteryGraphic } from './battery-graphic.js';
+import { drawDashboardHandbrakeIcon, drawDashboardLightIcon } from './dashboard-icons.js';
 import { drawSpeedometerGraphic } from './speedometer-graphic.js';
 
 let animatedSpeed = 0;
@@ -97,39 +98,36 @@ function drawSteeringWidget(ctx, centerX, centerY, state) {
   ctx.textAlign = 'left';
 }
 
-function drawBottomCards(ctx, panelX, panelY, panelW, panelH, state) {
-  const spacing = 16;
+function drawBottomIndicators(ctx, panelX, panelY, panelW, panelH, state) {
   const margin = 20;
-  const cardH = 88;
-  const cardY = state.ui.debugControls ? panelY + panelH - 240 : panelY + panelH - cardH - margin;
-  const cardW = Math.floor((panelW - margin * 2 - spacing * 2) / 3);
-  const firstX = panelX + margin;
-  const secondX = firstX + cardW + spacing;
-  const thirdX = secondX + cardW + spacing;
+  const indicatorsY = state.ui.debugControls ? panelY + panelH - 230 : panelY + panelH - 62;
+  const leftX = panelX + margin;
+  const rightX = panelX + panelW - margin - 120;
   const batteryPercent = Number.isFinite(state.hub.batteryPercent)
     ? Math.max(0, Math.min(100, Number(state.hub.batteryPercent)))
     : null;
+  const lightsValue = Number(state.control.lights);
+  const brakeOnly = lightsValue === 0x05;
+  const lightsOn = lightsValue === 0x00;
 
-  ctx.fillStyle = '#0b1220';
-  ctx.fillRect(firstX, cardY, cardW, cardH);
-  ctx.fillRect(secondX, cardY, cardW, cardH);
-  ctx.fillRect(thirdX, cardY, cardW, cardH);
+  drawDashboardLightIcon(ctx, {
+    x: leftX,
+    y: indicatorsY,
+    size: 26,
+    active: lightsOn,
+  });
+  drawDashboardHandbrakeIcon(ctx, {
+    x: leftX + 34,
+    y: indicatorsY,
+    size: 26,
+    active: brakeOnly,
+  });
 
-  ctx.fillStyle = '#94a3b8';
-  ctx.font = '13px Menlo';
-  ctx.fillText('LIGHT MODE', firstX + 14, cardY + 24);
-  ctx.fillText('MAX SPEED', secondX + 14, cardY + 24);
-  ctx.fillText('BATTERY', thirdX + 14, cardY + 20);
-
-  ctx.fillStyle = '#e5e7eb';
-  ctx.font = 'bold 24px Menlo';
-  ctx.fillText(state.control.lightModeLabel, firstX + 14, cardY + 58);
-  ctx.fillText(`${state.control.selectedSpeed}%`, secondX + 14, cardY + 58);
   drawBatteryGraphic(ctx, {
-    x: thirdX + 14,
-    y: cardY + 34,
-    width: cardW - 30,
-    height: 34,
+    x: rightX,
+    y: indicatorsY + 4,
+    width: 108,
+    height: 28,
     percent: batteryPercent,
   });
 }
@@ -191,8 +189,9 @@ export function renderDriveScreen(ctx, layout, state) {
     speed: displaySpeed,
     maxSpeed: 100,
     reverse: Number(displaySpeed || 0) < 0,
+    warningStart: Number(state.control.selectedSpeed || 100),
   });
   drawSteeringWidget(ctx, centerX, centerY, state);
-  drawBottomCards(ctx, panelX, panelY, panelW, panelH, state);
+  drawBottomIndicators(ctx, panelX, panelY, panelW, panelH, state);
   drawDebugPanel(ctx, panelX, panelY, panelW, panelH, state);
 }

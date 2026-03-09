@@ -42,6 +42,8 @@ export function createGamepadMonitor(sdl, handlers) {
   const menuButtons = new Set(['start', 'guide', 'back']);
   const primaryButtons = new Set(['a']);
   const secondaryButtons = new Set(['x']);
+  const lightToggleButtons = new Set(['y']);
+  const parkingToggleButtons = new Set(['b']);
 
   const state = {
     connected: false,
@@ -189,6 +191,14 @@ export function createGamepadMonitor(sdl, handlers) {
       }
       if (secondaryButtons.has(name)) {
         handlers.onSecondaryAction?.();
+        return;
+      }
+      if (lightToggleButtons.has(name)) {
+        handlers.onLightToggle?.();
+        return;
+      }
+      if (parkingToggleButtons.has(name)) {
+        handlers.onParkingToggle?.();
       }
     });
 

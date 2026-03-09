@@ -27,6 +27,7 @@ const LIGHT_MODES = [
   { value: LightMode.OFF, label: 'Off' }, // 0x04
   { value: LightMode.BRAKE_ONLY, label: 'Brake Only' }, // 0x05
 ];
+let lastNonParkingLights = LightMode.ON;
 
 const SCREEN_INITIAL = 'initial';
 const SCREEN_DRIVE = 'drive';
@@ -319,6 +320,32 @@ function cycleLightMode() {
   appState.control.lightModeLabel = next.label;
 }
 
+function setLightsMode(modeValue) {
+  const next = LIGHT_MODES.find((mode) => mode.value === modeValue) || LIGHT_MODES[0];
+  appState.control.lights = next.value;
+  appState.control.lightModeLabel = next.label;
+  if (next.value !== LightMode.BRAKE_ONLY) {
+    lastNonParkingLights = next.value;
+  }
+}
+
+function toggleLightsOnOff() {
+  if (appState.control.lights === LightMode.BRAKE_ONLY) {
+    setLightsMode(lastNonParkingLights === LightMode.OFF ? LightMode.OFF : LightMode.ON);
+    return;
+  }
+  setLightsMode(appState.control.lights === LightMode.ON ? LightMode.OFF : LightMode.ON);
+}
+
+function toggleParkingMode() {
+  if (appState.control.lights === LightMode.BRAKE_ONLY) {
+    setLightsMode(lastNonParkingLights === LightMode.OFF ? LightMode.OFF : LightMode.ON);
+    return;
+  }
+  lastNonParkingLights = appState.control.lights === LightMode.OFF ? LightMode.OFF : LightMode.ON;
+  setLightsMode(LightMode.BRAKE_ONLY);
+}
+
 async function runMenuSelection() {
   if (appState.ui.menuIndex === 0) {
     await disconnectPorsche();
@@ -473,6 +500,12 @@ const gamepadMonitor = createGamepadMonitor(sdl, {
   onMenuDown,
   onPrimaryAction,
   onSecondaryAction,
+  onLightToggle: () => {
+    toggleLightsOnOff();
+  },
+  onParkingToggle: () => {
+    toggleParkingMode();
+  },
   onChange: (next) => {
     if (Number(next.leftTrigger) < -0.05) triggerMode.leftIsSigned = true;
     if (Number(next.rightTrigger) < -0.05) triggerMode.rightIsSigned = true;
@@ -544,6 +577,14 @@ controlInterval = setInterval(() => {
     lightModeLabel: appState.control.lightModeLabel,
     inputSource,
   };
+
+  if (appState.control.lights === LightMode.BRAKE_ONLY) {
+    appState.control.speed = 0;
+    next = {
+      ...next,
+      speed: 0,
+    };
+  }
 
   if (
     next.speed === lastSent.speed &&

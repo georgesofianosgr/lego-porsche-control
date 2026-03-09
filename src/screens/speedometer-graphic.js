@@ -8,13 +8,22 @@ function toRad(deg) {
 
 export function drawSpeedometerGraphic(
   ctx,
-  { centerX, centerY, radius, speed, maxSpeed = 100, reverse = false },
+  {
+    centerX,
+    centerY,
+    radius,
+    speed,
+    maxSpeed = 100,
+    reverse = false,
+    warningStart = 100,
+  },
 ) {
   const startDeg = -210;
   const endDeg = 30;
   const sweepDeg = endDeg - startDeg;
   const value = clamp(Math.abs(speed), 0, maxSpeed);
   const ratio = maxSpeed > 0 ? value / maxSpeed : 0;
+  const warningRatio = clamp(warningStart, 0, maxSpeed) / maxSpeed;
 
   ctx.fillStyle = '#0b1220';
   ctx.beginPath();
@@ -27,11 +36,45 @@ export function drawSpeedometerGraphic(
   ctx.arc(centerX, centerY, radius - 12, toRad(startDeg), toRad(endDeg));
   ctx.stroke();
 
-  ctx.strokeStyle = reverse ? '#ef4444' : '#22c55e';
+  // Red zone from warningStart to maxSpeed
+  if (warningRatio < 1) {
+    ctx.strokeStyle = '#7f1d1d';
+    ctx.lineWidth = 12;
+    ctx.beginPath();
+    ctx.arc(
+      centerX,
+      centerY,
+      radius - 12,
+      toRad(startDeg + sweepDeg * warningRatio),
+      toRad(endDeg),
+    );
+    ctx.stroke();
+  }
+
+  const activeColor = reverse ? '#ef4444' : '#22c55e';
   ctx.lineWidth = 9;
-  ctx.beginPath();
-  ctx.arc(centerX, centerY, radius - 12, toRad(startDeg), toRad(startDeg + sweepDeg * ratio));
-  ctx.stroke();
+  if (ratio <= warningRatio || warningRatio >= 1) {
+    ctx.strokeStyle = activeColor;
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, radius - 12, toRad(startDeg), toRad(startDeg + sweepDeg * ratio));
+    ctx.stroke();
+  } else {
+    ctx.strokeStyle = activeColor;
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, radius - 12, toRad(startDeg), toRad(startDeg + sweepDeg * warningRatio));
+    ctx.stroke();
+
+    ctx.strokeStyle = '#ef4444';
+    ctx.beginPath();
+    ctx.arc(
+      centerX,
+      centerY,
+      radius - 12,
+      toRad(startDeg + sweepDeg * warningRatio),
+      toRad(startDeg + sweepDeg * ratio),
+    );
+    ctx.stroke();
+  }
 
   for (let tick = 0; tick <= maxSpeed; tick += 5) {
     const tickRatio = tick / maxSpeed;
