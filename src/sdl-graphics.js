@@ -66,7 +66,7 @@ function drawTopBar(ctx, width, state) {
 
 export function createGraphics() {
   const window = sdl.video.createWindow({
-    title: 'LEGO Porsche SDL',
+    title: 'Lego Porsche Control',
     width: WINDOW_WIDTH,
     height: WINDOW_HEIGHT,
     resizable: false,
@@ -125,7 +125,7 @@ export function createGraphics() {
 
     const data = ctx.getImageData(0, 0, INTERNAL_WIDTH, INTERNAL_HEIGHT).data;
     window.render(INTERNAL_WIDTH, INTERNAL_HEIGHT, INTERNAL_WIDTH * 4, 'rgba32', Buffer.from(data));
-    window.setTitle(`LEGO Porsche SDL | ${state.ui.screen.toUpperCase()}`);
+    window.setTitle('Lego Porsche Control');
   };
 
   const dispose = () => {

@@ -89,7 +89,9 @@ export function renderInitialScreen(ctx, layout, state) {
   const timedOut = String(hub.lastError || '').toLowerCase().includes('timeout');
   const isDisconnected = hub.status === 'Disconnected';
   const statusColor = hub.status === 'Connecting' ? UiTokens.warn : isDisconnected || timedOut ? UiTokens.err : UiTokens.ok;
-  drawStatusPill(ctx, hub.status.toUpperCase(), centerX, y, statusColor);
+  if (hub.status !== 'Disconnected') {
+    drawStatusPill(ctx, hub.status.toUpperCase(), centerX, y, statusColor);
+  }
 
   y += 54;
 
@@ -126,6 +128,14 @@ export function renderInitialScreen(ctx, layout, state) {
     ctx.font = 'bold 20px Menlo';
     ctx.fillText('Press X to connect', centerX, y);
   }
+
+  ctx.fillStyle = UiTokens.muted;
+  ctx.font = '13px Menlo';
+  ctx.fillText(
+    'You may need to pair LEGO Porsche in Bluetooth settings before connecting in the app.',
+    centerX,
+    cardY + cardH - 18,
+  );
 
   ctx.textAlign = 'left';
 }
