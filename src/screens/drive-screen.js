@@ -62,17 +62,17 @@ function drawStatusStrip(ctx, panelX, panelY, panelW, state) {
   ctx.stroke();
 }
 
-function drawSteeringWidget(ctx, centerX, centerY, state) {
+function drawSteeringWidget(ctx, centerX, barY, state) {
   const angle = Number(state.control.angle || 0);
   const barW = 440;
   const barH = 20;
   const barX = centerX - barW / 2;
-  const barY = centerY + 190;
+  const labelY = barY - 10;
 
   ctx.fillStyle = '#94a3b8';
   ctx.font = '14px Menlo';
   ctx.textAlign = 'center';
-  ctx.fillText(`STEERING ${angle}`, centerX, barY - 10);
+  ctx.fillText(`STEERING ${angle}`, centerX, labelY);
 
   ctx.fillStyle = '#1f2937';
   ctx.fillRect(barX, barY, barW, barH);
@@ -100,7 +100,9 @@ function drawSteeringWidget(ctx, centerX, centerY, state) {
 
 function drawBottomIndicators(ctx, panelX, panelY, panelW, panelH, state) {
   const margin = 20;
-  const indicatorsY = state.ui.debugControls ? panelY + panelH - 230 : panelY + panelH - 62;
+  const rowTop = state.ui.debugControls ? panelY + panelH - 232 : panelY + panelH - 66;
+  const rowMid = rowTop + 20;
+  const indicatorsY = rowMid - 13;
   const leftX = panelX + margin;
   const rightX = panelX + panelW - margin - 120;
   const batteryPercent = Number.isFinite(state.hub.batteryPercent)
@@ -125,11 +127,15 @@ function drawBottomIndicators(ctx, panelX, panelY, panelW, panelH, state) {
 
   drawBatteryGraphic(ctx, {
     x: rightX,
-    y: indicatorsY + 4,
+    y: rowMid - 14,
     width: 108,
     height: 28,
     percent: batteryPercent,
   });
+
+  return {
+    steeringBarY: rowMid - 10,
+  };
 }
 
 function drawDebugPanel(ctx, panelX, panelY, panelW, panelH, state) {
@@ -191,7 +197,7 @@ export function renderDriveScreen(ctx, layout, state) {
     reverse: Number(displaySpeed || 0) < 0,
     warningStart: Number(state.control.selectedSpeed || 100),
   });
-  drawSteeringWidget(ctx, centerX, centerY, state);
-  drawBottomIndicators(ctx, panelX, panelY, panelW, panelH, state);
+  const bottom = drawBottomIndicators(ctx, panelX, panelY, panelW, panelH, state);
+  drawSteeringWidget(ctx, centerX, bottom.steeringBarY, state);
   drawDebugPanel(ctx, panelX, panelY, panelW, panelH, state);
 }
