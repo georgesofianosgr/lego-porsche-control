@@ -18,6 +18,7 @@ export class TechnicMoveHub {
     this.characteristic = null;
     this.connectedAddress = null;
     this.connectedName = null;
+    this.pairingNote = null;
   }
 
   static clamp(value, low = -100, high = 100) {
@@ -110,6 +111,7 @@ export class TechnicMoveHub {
   async connect({ timeout = 5, address = null }) {
     this.connectedAddress = null;
     this.connectedName = null;
+    this.pairingNote = null;
     const peripherals = await this.scan({ timeout });
 
     for (const peripheral of peripherals) {
@@ -123,6 +125,7 @@ export class TechnicMoveHub {
 
       try {
         await peripheral.connectAsync();
+        await this.ensureWindowsPairing(peripheral);
         const targetService = normalizeUuid(SERVICE_UUID);
         const targetChar = normalizeUuid(CHAR_UUID);
         const { characteristics } = await peripheral.discoverSomeServicesAndCharacteristicsAsync(
@@ -164,6 +167,32 @@ export class TechnicMoveHub {
       this.peripheral = null;
       this.characteristic = null;
       this.connectedName = null;
+      this.pairingNote = null;
+    }
+  }
+
+  async ensureWindowsPairing(peripheral) {
+    if (process.platform !== 'win32') return;
+
+    const methodCandidates = ['pairAsync', 'pair', 'bondAsync', 'bond'];
+    const methodName = methodCandidates.find((name) => typeof peripheral?.[name] === 'function');
+
+    if (!methodName) {
+      this.pairingNote =
+        'Windows pairing API is not available via noble; pair the hub in Windows Bluetooth settings.';
+      return;
+    }
+
+    try {
+      const result = await peripheral[methodName]({ protectionLevel: 2 });
+      if (result === false) {
+        this.pairingNote =
+          'Pairing call returned false; pair the hub in Windows Bluetooth settings if control fails.';
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      this.pairingNote =
+        `Pairing attempt via '${methodName}' failed (${msg}); pair the hub in Windows Bluetooth settings.`;
     }
   }
 

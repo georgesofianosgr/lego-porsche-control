@@ -14,6 +14,8 @@ const CONNECTION_TIMEOUT_SECONDS = 15;
 const STEER_MAX = 100;
 const LIGHTS_ON = 0x00;
 const TRIGGER_DEADZONE = 0.06;
+const STICK_CENTER_DEADZONE = 0.08;
+const STICK_OUTER_THRESHOLD = 0.9;
 const DEFAULT_SPEED = 100;
 const SPEED_STEP = 25;
 const SPEED_MIN = 0;
@@ -26,6 +28,7 @@ const SCREEN_DRIVE = 'drive';
 const SCREEN_MENU = 'menu';
 const SCREEN_GAMEPAD = 'gamepad';
 const useMock = process.argv.includes('--mock');
+const debugControls = process.argv.includes('--debug-controls') || process.argv.includes('--debug');
 
 const graphics = createGraphics();
 const porsche = useMock
@@ -37,6 +40,7 @@ let connectInFlight = false;
 let renderInterval = null;
 let controlInterval = null;
 let lastDriveSentAt = 0;
+let lastDebugLine = null;
 
 const triggerMode = {
   leftIsSigned: false,
@@ -44,8 +48,8 @@ const triggerMode = {
 };
 
 const triggerRange = {
-  left: { min: 1, max: 0 },
-  right: { min: 1, max: 0 },
+  left: { max: 0, neutral: null },
+  right: { max: 0, neutral: null },
 };
 
 const appState = {
@@ -123,6 +127,23 @@ function applyDeadzone(value, deadzone) {
   return Math.abs(v) < deadzone ? 0 : v;
 }
 
+function normalizeStickAxis(
+  value,
+  centerDeadzone = STICK_CENTER_DEADZONE,
+  outerThreshold = STICK_OUTER_THRESHOLD,
+) {
+  const v = clampUnit(value);
+  const abs = Math.abs(v);
+  if (abs <= centerDeadzone) return 0;
+  if (abs >= outerThreshold) return Math.sign(v);
+
+  const span = outerThreshold - centerDeadzone;
+  if (span <= 0) return Math.sign(v);
+
+  const scaled = (abs - centerDeadzone) / span;
+  return Math.sign(v) * clamp01(scaled);
+}
+
 function normalizeTrigger(value, isSignedMode) {
   const v = Number(value) || 0;
   if (isSignedMode) return clamp01((v + 1) / 2);
@@ -131,14 +152,32 @@ function normalizeTrigger(value, isSignedMode) {
 
 function updateTriggerRange(stats, raw) {
   if (!Number.isFinite(raw)) return;
-  if (raw < stats.min) stats.min = raw;
   if (raw > stats.max) stats.max = raw;
 }
 
 function scaleTriggerByRange(raw, stats) {
-  const range = stats.max - stats.min;
-  if (!Number.isFinite(range) || range < 0.08) return raw;
-  return clamp01((raw - stats.min) / range);
+  const neutral =
+    typeof stats.neutral === 'number'
+      ? stats.neutral
+      : raw >= 0.3 && raw <= 0.7
+        ? 0.5
+        : 0;
+
+  const top = Math.max(stats.max, neutral + 0.08);
+  const range = top - neutral;
+  if (!Number.isFinite(range) || range < 0.06) return clamp01(raw - neutral);
+  return clamp01((raw - neutral) / range);
+}
+
+function updateTriggerNeutral(stats, raw) {
+  if (!Number.isFinite(raw)) return;
+  // Learn neutral from the resting midpoint band.
+  if (raw < 0.35 || raw > 0.65) return;
+  if (stats.neutral === null) {
+    stats.neutral = raw;
+    return;
+  }
+  stats.neutral = stats.neutral * 0.9 + raw * 0.1;
 }
 
 function hasKeyboardDriveInput(keyboard) {
@@ -146,7 +185,8 @@ function hasKeyboardDriveInput(keyboard) {
 }
 
 function computeDriveFromGamepad(gamepad) {
-  const steer = clampUnit(gamepad.leftStickX);
+  const steerRaw = clampUnit(gamepad.leftStickX);
+  const steer = normalizeStickAxis(steerRaw);
   const forwardRaw = normalizeTrigger(gamepad.rightTrigger, triggerMode.rightIsSigned);
   const reverseRaw = normalizeTrigger(gamepad.leftTrigger, triggerMode.leftIsSigned);
   const forwardAxis = scaleTriggerByRange(forwardRaw, triggerRange.right);
@@ -158,11 +198,35 @@ function computeDriveFromGamepad(gamepad) {
   const throttle = applyDeadzone(forward - reverse, TRIGGER_DEADZONE);
   const speedScale = appState.control.selectedSpeed / 100;
 
-  return {
+  const command = {
     speed: Math.round(throttle * 100 * speedScale),
     angle: Math.round(steer * STEER_MAX),
     lights: LIGHTS_ON,
   };
+
+  const debug = {
+    steerInput: Number(gamepad.leftStickX || 0),
+    steerClamped: steerRaw,
+    steerNormalized: steer,
+    triggerLeftRaw: Number(gamepad.leftTrigger || 0),
+    triggerRightRaw: Number(gamepad.rightTrigger || 0),
+    triggerLeftSignedMode: triggerMode.leftIsSigned,
+    triggerRightSignedMode: triggerMode.rightIsSigned,
+    triggerLeftNormalized: reverseRaw,
+    triggerRightNormalized: forwardRaw,
+    triggerLeftScaled: reverseAxis,
+    triggerRightScaled: forwardAxis,
+    triggerRangeLeft: { ...triggerRange.left },
+    triggerRangeRight: { ...triggerRange.right },
+    forward,
+    reverse,
+    throttle,
+    speedScale,
+    commandSpeed: command.speed,
+    commandAngle: command.angle,
+  };
+
+  return { command, debug };
 }
 
 function computeDriveFromKeyboard(keyboard) {
@@ -178,6 +242,14 @@ function computeDriveFromKeyboard(keyboard) {
   if (keyboard.d && !keyboard.a) angle = KEYBOARD_ANGLE;
 
   return { speed, angle, lights: LIGHTS_ON };
+}
+
+function debugControlLog(payload) {
+  if (!debugControls) return;
+  const line = JSON.stringify(payload);
+  if (line === lastDebugLine) return;
+  lastDebugLine = line;
+  console.log(`[control-debug] ${line}`);
 }
 
 function syncMainScreenWithConnection() {
@@ -383,13 +455,15 @@ const gamepadMonitor = createGamepadMonitor(sdl, {
     if (Number(next.rightTrigger) < -0.05) triggerMode.rightIsSigned = true;
 
     if (!next.connected) {
-      triggerRange.left.min = 1;
       triggerRange.left.max = 0;
-      triggerRange.right.min = 1;
+      triggerRange.left.neutral = null;
       triggerRange.right.max = 0;
+      triggerRange.right.neutral = null;
     } else {
       const leftRaw = normalizeTrigger(next.leftTrigger, triggerMode.leftIsSigned);
       const rightRaw = normalizeTrigger(next.rightTrigger, triggerMode.rightIsSigned);
+      updateTriggerNeutral(triggerRange.left, leftRaw);
+      updateTriggerNeutral(triggerRange.right, rightRaw);
       updateTriggerRange(triggerRange.left, leftRaw);
       updateTriggerRange(triggerRange.right, rightRaw);
     }
@@ -418,10 +492,24 @@ controlInterval = setInterval(() => {
   if (appState.hub.status !== 'Connected') return;
 
   let next = { speed: 0, angle: 0, lights: LIGHTS_ON };
+  let controlDebug = null;
   if (appState.ui.screen === SCREEN_DRIVE) {
-    next = hasKeyboardDriveInput(appState.keyboard)
-      ? computeDriveFromKeyboard(appState.keyboard)
-      : computeDriveFromGamepad(appState.gamepad);
+    if (hasKeyboardDriveInput(appState.keyboard)) {
+      next = computeDriveFromKeyboard(appState.keyboard);
+      controlDebug = {
+        source: 'keyboard',
+        keyboard: { ...appState.keyboard },
+        commandSpeed: next.speed,
+        commandAngle: next.angle,
+      };
+    } else {
+      const gamepadControl = computeDriveFromGamepad(appState.gamepad);
+      next = gamepadControl.command;
+      controlDebug = {
+        source: 'gamepad',
+        ...gamepadControl.debug,
+      };
+    }
   }
 
   appState.control = { ...next, selectedSpeed: appState.control.selectedSpeed };
@@ -438,6 +526,12 @@ controlInterval = setInterval(() => {
 
   lastSent = next;
   lastDriveSentAt = Date.now();
+  debugControlLog({
+    at: new Date().toISOString(),
+    selectedSpeed: appState.control.selectedSpeed,
+    sent: next,
+    debug: controlDebug,
+  });
   void porsche.drive(next);
 }, CONTROL_MS);
 

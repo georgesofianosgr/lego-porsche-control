@@ -169,8 +169,6 @@ export function createGamepadMonitor(sdl, handlers) {
 
       if (name === 'leftshoulder') state.leftShoulder = true;
       if (name === 'rightshoulder') state.rightShoulder = true;
-      if (name === 'lefttrigger') state.leftTrigger = 1;
-      if (name === 'righttrigger') state.rightTrigger = 1;
       emitState();
 
       if (menuButtons.has(name)) {
@@ -198,8 +196,6 @@ export function createGamepadMonitor(sdl, handlers) {
       const name = String(event?.button || '').toLowerCase();
       if (name === 'leftshoulder') state.leftShoulder = false;
       if (name === 'rightshoulder') state.rightShoulder = false;
-      if (name === 'lefttrigger') state.leftTrigger = 0;
-      if (name === 'righttrigger') state.rightTrigger = 0;
       emitState();
     });
 

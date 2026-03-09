@@ -20,6 +20,7 @@ export function createPorscheConnection({
     timeoutSeconds,
     remainingSeconds: null,
     lastError: null,
+    pairingNote: null,
   };
 
   let connectRequestId = 0;
@@ -62,6 +63,7 @@ export function createPorscheConnection({
           state.address = hub.connectedAddress || null;
           state.remainingSeconds = null;
           state.lastError = null;
+          state.pairingNote = hub.pairingNote || null;
           connectDeadlineMs = null;
           return snapshot();
         }
@@ -92,6 +94,7 @@ export function createPorscheConnection({
     state.address = null;
     state.remainingSeconds = null;
     connectDeadlineMs = null;
+    state.pairingNote = null;
   };
 
   const drive = async ({ speed = 0, angle = 0, lights = 0x00 } = {}) => {
