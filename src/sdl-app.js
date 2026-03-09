@@ -11,7 +11,7 @@ import { LightMode } from './constants.js';
 
 const REFRESH_MS = 100;
 const CONTROL_MS = 50;
-const CONNECTION_TIMEOUT_SECONDS = 15;
+const CONNECTION_TIMEOUT_SECONDS = 30;
 const STEER_MAX = 100;
 const TRIGGER_DEADZONE = 0.06;
 const STICK_CENTER_DEADZONE = 0.08;
