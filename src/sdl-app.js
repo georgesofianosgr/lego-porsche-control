@@ -8,6 +8,7 @@ import { createGamepadMonitor } from './sdl-gamepad.js';
 import { createPorscheConnection } from './porsche-connection.js';
 import { createMockConnection } from './mocks/mock-connection.js';
 import { LightMode } from './constants.js';
+import { getMenuItems } from './menu-items.js';
 
 const REFRESH_MS = 100;
 const CONTROL_MS = 50;
@@ -430,26 +431,28 @@ function toggleParkingMode() {
 }
 
 async function runMenuSelection() {
-  if (appState.ui.menuIndex === 0) {
+  const items = getMenuItems(appState);
+  if (!items.length) return;
+  const index = Math.max(0, Math.min(appState.ui.menuIndex, items.length - 1));
+  appState.ui.menuIndex = index;
+  const selected = items[index];
+
+  if (selected.id === 'disconnect') {
     await disconnectPorsche();
     appState.ui.screen = SCREEN_INITIAL;
     appState.ui.previousScreen = SCREEN_INITIAL;
     return;
   }
-  if (appState.ui.menuIndex === 1) {
+  if (selected.id === 'gamepad') {
     appState.ui.previousScreen = appState.ui.screen;
     appState.ui.screen = SCREEN_GAMEPAD;
     return;
   }
-  if (appState.ui.menuIndex === 2) {
-    cycleLightMode();
-    return;
-  }
-  if (appState.ui.menuIndex === 3) {
+  if (selected.id === 'fullscreen') {
     toggleFullscreen();
     return;
   }
-  if (appState.ui.menuIndex === 4) {
+  if (selected.id === 'exit') {
     await exit();
   }
 }
@@ -500,7 +503,11 @@ function onSecondaryAction() {
 
 function onMenuUp() {
   if (appState.ui.screen === SCREEN_MENU) {
-    appState.ui.menuIndex = appState.ui.menuIndex > 0 ? appState.ui.menuIndex - 1 : 4;
+    const items = getMenuItems(appState);
+    if (!items.length) return;
+    const last = items.length - 1;
+    const index = Math.max(0, Math.min(appState.ui.menuIndex, last));
+    appState.ui.menuIndex = index > 0 ? index - 1 : last;
     return;
   }
   if (appState.ui.screen === SCREEN_GAMEPAD) {
@@ -510,7 +517,11 @@ function onMenuUp() {
 
 function onMenuDown() {
   if (appState.ui.screen === SCREEN_MENU) {
-    appState.ui.menuIndex = appState.ui.menuIndex < 4 ? appState.ui.menuIndex + 1 : 0;
+    const items = getMenuItems(appState);
+    if (!items.length) return;
+    const last = items.length - 1;
+    const index = Math.max(0, Math.min(appState.ui.menuIndex, last));
+    appState.ui.menuIndex = index < last ? index + 1 : 0;
     return;
   }
   if (appState.ui.screen === SCREEN_GAMEPAD) {
