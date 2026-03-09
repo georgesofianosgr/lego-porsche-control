@@ -21,7 +21,25 @@ export function createPorscheConnection({
     remainingSeconds: null,
     lastError: null,
     pairingNote: null,
+    batteryPercent: null,
+    batteryUpdatedAt: null,
+    batteryLastMessage: null,
   };
+
+  hub.setupMessageHandlers({
+    onBatteryChanged: (percent) => {
+      state.batteryPercent = percent;
+      state.batteryUpdatedAt = Date.now();
+    },
+    onHubPropertyMessage: (message) => {
+      state.batteryLastMessage = {
+        msgType: message.msgType,
+        property: message.property,
+        operation: message.operation,
+        value: message.value,
+      };
+    },
+  });
 
   let connectRequestId = 0;
   let connectDeadlineMs = null;
@@ -47,6 +65,9 @@ export function createPorscheConnection({
     state.status = 'Connecting';
     state.remainingSeconds = timeoutSeconds;
     state.lastError = null;
+    state.batteryPercent = null;
+    state.batteryUpdatedAt = null;
+    state.batteryLastMessage = null;
     connectDeadlineMs = Date.now() + timeoutSeconds * 1000;
 
     const timeoutAt = connectDeadlineMs;
@@ -58,6 +79,11 @@ export function createPorscheConnection({
         const connected = await hub.connect({ timeout: 1 });
         if (connected) {
           await hub.calibrate();
+          try {
+            await hub.enableBatteryUpdates();
+          } catch (err) {
+            state.lastError = err instanceof Error ? err.message : String(err);
+          }
           state.status = 'Connected';
           state.name = hub.connectedName || deviceName;
           state.address = hub.connectedAddress || null;
@@ -95,6 +121,9 @@ export function createPorscheConnection({
     state.remainingSeconds = null;
     connectDeadlineMs = null;
     state.pairingNote = null;
+    state.batteryPercent = null;
+    state.batteryUpdatedAt = null;
+    state.batteryLastMessage = null;
   };
 
   const drive = async ({ speed = 0, angle = 0, lights = 0x00 } = {}) => {

@@ -1,0 +1,15 @@
+export const UiTokens = {
+  title: 'bold 30px Menlo',
+  heading: 'bold 24px Menlo',
+  body: '16px Menlo',
+  bodyStrong: 'bold 16px Menlo',
+  item: '20px Menlo',
+  itemSelected: 'bold 24px Menlo',
+  muted: '#94a3b8',
+  text: '#e5e7eb',
+  panel: '#111827',
+  panelAlt: '#0b1220',
+  ok: '#22c55e',
+  warn: '#f59e0b',
+  err: '#ef4444',
+};

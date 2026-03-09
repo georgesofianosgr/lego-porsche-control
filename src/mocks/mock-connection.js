@@ -14,6 +14,9 @@ export function createMockConnection({ timeoutSeconds = 15, deviceName = 'Mock P
     timeoutSeconds,
     remainingSeconds: null,
     lastError: null,
+    batteryPercent: null,
+    batteryUpdatedAt: null,
+    batteryLastMessage: null,
   };
 
   let connectRequestId = 0;
@@ -42,6 +45,14 @@ export function createMockConnection({ timeoutSeconds = 15, deviceName = 'Mock P
     state.address = 'MOCK:PORSCHE:42176';
     state.remainingSeconds = null;
     state.lastError = null;
+    state.batteryPercent = 87;
+    state.batteryUpdatedAt = Date.now();
+    state.batteryLastMessage = {
+      msgType: 0x01,
+      property: 0x06,
+      operation: 0x06,
+      value: 87,
+    };
     return getState();
   };
 
@@ -52,6 +63,9 @@ export function createMockConnection({ timeoutSeconds = 15, deviceName = 'Mock P
     state.name = null;
     state.address = null;
     state.remainingSeconds = null;
+    state.batteryPercent = null;
+    state.batteryUpdatedAt = null;
+    state.batteryLastMessage = null;
   };
 
   const drive = async (payload) => {

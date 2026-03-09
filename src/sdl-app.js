@@ -90,6 +90,9 @@ const appState = {
     timeoutSeconds: CONNECTION_TIMEOUT_SECONDS,
     remainingSeconds: null,
     lastError: null,
+    batteryPercent: null,
+    batteryUpdatedAt: null,
+    batteryLastMessage: null,
   },
   control: {
     speed: 0,
@@ -97,6 +100,7 @@ const appState = {
     lights: LIGHT_MODES[0].value,
     lightModeLabel: LIGHT_MODES[0].label,
     selectedSpeed: DEFAULT_SPEED,
+    inputSource: 'idle',
   },
   keyboard: {
     w: false,
@@ -110,6 +114,7 @@ const appState = {
     menuIndex: 0,
     mockMode: useMock,
     isFullscreen: false,
+    debugControls,
   },
   mock: {
     porsche: null,
@@ -511,9 +516,11 @@ controlInterval = setInterval(() => {
 
   let next = { speed: 0, angle: 0, lights: appState.control.lights };
   let controlDebug = null;
+  let inputSource = 'idle';
   if (appState.ui.screen === SCREEN_DRIVE) {
     if (hasKeyboardDriveInput(appState.keyboard)) {
       next = computeDriveFromKeyboard(appState.keyboard);
+      inputSource = 'keyboard';
       controlDebug = {
         source: 'keyboard',
         keyboard: { ...appState.keyboard },
@@ -523,6 +530,7 @@ controlInterval = setInterval(() => {
     } else {
       const gamepadControl = computeDriveFromGamepad(appState.gamepad);
       next = gamepadControl.command;
+      inputSource = 'gamepad';
       controlDebug = {
         source: 'gamepad',
         ...gamepadControl.debug,
@@ -534,6 +542,7 @@ controlInterval = setInterval(() => {
     ...next,
     selectedSpeed: appState.control.selectedSpeed,
     lightModeLabel: appState.control.lightModeLabel,
+    inputSource,
   };
 
   if (

@@ -19,6 +19,9 @@ export class TechnicMoveHub {
     this.connectedAddress = null;
     this.connectedName = null;
     this.pairingNote = null;
+    this.onBatteryChanged = null;
+    this.onHubPropertyMessage = null;
+    this.notifyHandler = null;
   }
 
   static clamp(value, low = -100, high = 100) {
@@ -54,6 +57,10 @@ export class TechnicMoveHub {
       Buffer.from('0d008136115100030000001000', 'hex'),
       Buffer.from('0d008136115100030000000800', 'hex'),
     ];
+  }
+
+  static buildHubPropertyPayload(property, operation) {
+    return Buffer.from([0x05, 0x00, 0x01, property & 0xff, operation & 0xff]);
   }
 
   static isHubCandidate(peripheral, expectedName) {
@@ -109,6 +116,9 @@ export class TechnicMoveHub {
   }
 
   async connect({ timeout = 5, address = null }) {
+    this.cleanupNotifications();
+    this.characteristic = null;
+    this.peripheral = null;
     this.connectedAddress = null;
     this.connectedName = null;
     this.pairingNote = null;
@@ -140,6 +150,7 @@ export class TechnicMoveHub {
 
         this.peripheral = peripheral;
         this.characteristic = characteristics[0];
+        await this.setupNotifications();
         this.connectedAddress = peripheralAddress;
         this.connectedName = peripheral?.advertisement?.localName || null;
         return true;
@@ -164,10 +175,71 @@ export class TechnicMoveHub {
         await this.peripheral.disconnectAsync();
       }
     } finally {
+      this.cleanupNotifications();
       this.peripheral = null;
       this.characteristic = null;
       this.connectedName = null;
       this.pairingNote = null;
+    }
+  }
+
+  setupMessageHandlers({ onBatteryChanged = null, onHubPropertyMessage = null } = {}) {
+    this.onBatteryChanged = typeof onBatteryChanged === 'function' ? onBatteryChanged : null;
+    this.onHubPropertyMessage =
+      typeof onHubPropertyMessage === 'function' ? onHubPropertyMessage : null;
+  }
+
+  async setupNotifications() {
+    if (!this.characteristic) return;
+    this.cleanupNotifications();
+    this.notifyHandler = (data) => {
+      this.handleNotifyPayload(data);
+    };
+    this.characteristic.on('data', this.notifyHandler);
+    await this.characteristic.subscribeAsync();
+  }
+
+  cleanupNotifications() {
+    if (!this.characteristic || !this.notifyHandler) return;
+    this.characteristic.removeListener('data', this.notifyHandler);
+    this.notifyHandler = null;
+  }
+
+  handleNotifyPayload(data) {
+    const payload = Buffer.isBuffer(data) ? data : Buffer.from(data || []);
+    if (!payload.length) return;
+
+    let offset = 0;
+    while (offset < payload.length) {
+      const len = payload[offset];
+      if (!len || offset + len > payload.length) break;
+      const frame = payload.subarray(offset, offset + len);
+      this.parseFrame(frame);
+      offset += len;
+    }
+  }
+
+  parseFrame(frame) {
+    if (!frame || frame.length < 5) return;
+    const msgType = frame[2];
+    if (msgType !== 0x01) return;
+
+    const property = frame[3];
+    const operation = frame[4];
+    const value = frame.length > 5 ? frame[5] : null;
+
+    if (this.onHubPropertyMessage) {
+      this.onHubPropertyMessage({
+        msgType,
+        property,
+        operation,
+        value,
+        raw: Buffer.from(frame),
+      });
+    }
+
+    if (property === 0x06 && value !== null && this.onBatteryChanged) {
+      this.onBatteryChanged(TechnicMoveHub.clamp(value, 0, 100));
     }
   }
 
@@ -207,6 +279,14 @@ export class TechnicMoveHub {
     const [first, second] = TechnicMoveHub.calibrationPayloads();
     await this.send(first);
     await this.send(second);
+  }
+
+  async enableBatteryUpdates() {
+    await this.send(TechnicMoveHub.buildHubPropertyPayload(0x06, 0x02));
+  }
+
+  async requestBatteryUpdate() {
+    await this.send(TechnicMoveHub.buildHubPropertyPayload(0x06, 0x05));
   }
 
   async drive({ speed = 0, angle = 0, lights = 0x00 } = {}) {
