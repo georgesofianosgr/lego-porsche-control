@@ -6,16 +6,22 @@ const ICON_PATHS = {
     primary: '../assets/controller-buttons/xbox/primary.png',
     secondary: '../assets/controller-buttons/xbox/secondary.png',
     menu: '../assets/controller-buttons/xbox/menu.png',
+    lights: '../assets/controller-buttons/xbox/lights.png',
+    parking: '../assets/controller-buttons/xbox/parking.png',
   },
   dualsense: {
     primary: '../assets/controller-buttons/dualsense/primary.png',
     secondary: '../assets/controller-buttons/dualsense/secondary.png',
     menu: '../assets/controller-buttons/dualsense/menu.png',
+    lights: '../assets/controller-buttons/dualsense/lights.png',
+    parking: '../assets/controller-buttons/dualsense/parking.png',
   },
   dualshock: {
     primary: '../assets/controller-buttons/dualshock/primary.png',
     secondary: '../assets/controller-buttons/dualshock/secondary.png',
     menu: '../assets/controller-buttons/dualshock/menu.png',
+    lights: '../assets/controller-buttons/dualshock/lights.png',
+    parking: '../assets/controller-buttons/dualshock/parking.png',
   },
 };
 
@@ -34,16 +40,22 @@ const ICONS = {
     primary: loadImage(ICON_PATHS.xbox.primary),
     secondary: loadImage(ICON_PATHS.xbox.secondary),
     menu: loadImage(ICON_PATHS.xbox.menu),
+    lights: loadImage(ICON_PATHS.xbox.lights),
+    parking: loadImage(ICON_PATHS.xbox.parking),
   },
   dualsense: {
     primary: loadImage(ICON_PATHS.dualsense.primary),
     secondary: loadImage(ICON_PATHS.dualsense.secondary),
     menu: loadImage(ICON_PATHS.dualsense.menu),
+    lights: loadImage(ICON_PATHS.dualsense.lights),
+    parking: loadImage(ICON_PATHS.dualsense.parking),
   },
   dualshock: {
     primary: loadImage(ICON_PATHS.dualshock.primary),
     secondary: loadImage(ICON_PATHS.dualshock.secondary),
     menu: loadImage(ICON_PATHS.dualshock.menu),
+    lights: loadImage(ICON_PATHS.dualshock.lights),
+    parking: loadImage(ICON_PATHS.dualshock.parking),
   },
 };
 
@@ -61,3 +73,7 @@ export function getButtonIcon(gamepadState, action) {
   return ICONS[family]?.[action] || null;
 }
 
+export function getButtonIconForFamily(family, action) {
+  const key = family === 'dualshock' || family === 'dualsense' ? family : 'xbox';
+  return ICONS[key]?.[action] || null;
+}
