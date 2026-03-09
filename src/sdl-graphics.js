@@ -9,6 +9,9 @@ const WINDOW_WIDTH = 1280;
 const WINDOW_HEIGHT = 720;
 const INTERNAL_WIDTH = 1920;
 const INTERNAL_HEIGHT = 1080;
+const UI_SCALE = 2;
+const VIRTUAL_WIDTH = Math.round(INTERNAL_WIDTH / UI_SCALE);
+const VIRTUAL_HEIGHT = Math.round(INTERNAL_HEIGHT / UI_SCALE);
 const BG = '#0f172a';
 const FG = '#e5e7eb';
 const MUTED = '#94a3b8';
@@ -63,17 +66,18 @@ export function createGraphics() {
     // Render everything in fixed 1080p, then let SDL scale to window/fullscreen.
     const canvas = createCanvas(INTERNAL_WIDTH, INTERNAL_HEIGHT);
     const ctx = canvas.getContext('2d');
+    ctx.setTransform(UI_SCALE, 0, 0, UI_SCALE, 0, 0);
 
     ctx.fillStyle = BG;
-    ctx.fillRect(0, 0, INTERNAL_WIDTH, INTERNAL_HEIGHT);
+    ctx.fillRect(0, 0, VIRTUAL_WIDTH, VIRTUAL_HEIGHT);
 
-    drawTopBar(ctx, INTERNAL_WIDTH, state);
+    drawTopBar(ctx, VIRTUAL_WIDTH, state);
 
     const layout = {
       panelX: 24,
       panelY: 76,
-      panelW: INTERNAL_WIDTH - 48,
-      panelH: INTERNAL_HEIGHT - 100,
+      panelW: VIRTUAL_WIDTH - 48,
+      panelH: VIRTUAL_HEIGHT - 100,
       FG,
       MUTED,
       OK,
