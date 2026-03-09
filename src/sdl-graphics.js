@@ -1,5 +1,6 @@
 import sdl from '@kmamal/sdl';
-import { createCanvas } from '@napi-rs/canvas';
+import fs from 'node:fs';
+import { createCanvas, Image } from '@napi-rs/canvas';
 import { renderInitialScreen } from './screens/initial-screen.js';
 import { renderDriveScreen } from './screens/drive-screen.js';
 import { renderMenuScreen } from './screens/menu-screen.js';
@@ -16,6 +17,19 @@ const BG = '#0f172a';
 const FG = '#e5e7eb';
 const MUTED = '#94a3b8';
 const OK = '#22c55e';
+const PORSCHE_LOGO_PATH = new URL('../assets/porsche-logo.png', import.meta.url);
+
+function loadPorscheLogo() {
+  try {
+    const image = new Image();
+    image.src = fs.readFileSync(PORSCHE_LOGO_PATH);
+    return image;
+  } catch (_err) {
+    return null;
+  }
+}
+
+const PORSCHE_LOGO = loadPorscheLogo();
 
 function toPositiveInt(value, fallback) {
   const n = Number(value);
@@ -24,9 +38,23 @@ function toPositiveInt(value, fallback) {
 }
 
 function drawTopBar(ctx, width, state) {
-  ctx.fillStyle = FG;
+  const logoW = 26;
+  const logoH = 34;
+  const logoX = 32;
+  const titleBaselineY = 48;
   ctx.font = 'bold 28px Menlo';
-  ctx.fillText('LEGO Porsche', 32, 48);
+  const titleMetrics = ctx.measureText('LEGO Porsche');
+  const ascent = titleMetrics.actualBoundingBoxAscent || 22;
+  const descent = titleMetrics.actualBoundingBoxDescent || 6;
+  const textCenterY = titleBaselineY + (descent - ascent) / 2;
+  const logoY = Math.round(textCenterY - logoH / 2);
+  if (PORSCHE_LOGO) {
+    ctx.drawImage(PORSCHE_LOGO, logoX, logoY, logoW, logoH);
+  }
+
+  const titleX = PORSCHE_LOGO ? logoX + logoW + 12 : logoX;
+  ctx.fillStyle = FG;
+  ctx.fillText('LEGO Porsche', titleX, titleBaselineY);
 
   const menuLabel = state?.gamepad?.profile?.menu || 'Options';
   const hint = state.ui.screen === 'menu' ? `${menuLabel}: Back` : `${menuLabel}: Menu`;
