@@ -5,6 +5,7 @@ import { renderInitialScreen } from './screens/initial-screen.js';
 import { renderDriveScreen } from './screens/drive-screen.js';
 import { renderMenuScreen } from './screens/menu-screen.js';
 import { renderGamepadScreen } from './screens/gamepad-screen.js';
+import { getButtonIcon } from './button-icons.js';
 
 const WINDOW_WIDTH = 1280;
 const WINDOW_HEIGHT = 720;
@@ -56,12 +57,32 @@ function drawTopBar(ctx, width, state) {
   ctx.fillStyle = FG;
   ctx.fillText('LEGO Porsche', titleX, titleBaselineY);
 
-  const menuLabel = state?.gamepad?.profile?.menu || 'Options';
-  const hint = state.ui.screen === 'menu' ? `${menuLabel}: Back` : `${menuLabel}: Menu`;
+  const hint = state.ui.screen === 'menu' ? 'Back' : 'Menu';
   ctx.font = '16px Menlo';
   ctx.fillStyle = MUTED;
+  const hintBaselineY = 38;
   const textWidth = ctx.measureText(hint).width;
-  ctx.fillText(hint, width - textWidth - 32, 38);
+  const iconSize = 20;
+  const gap = 8;
+  const rightPad = 32;
+  const textX = width - textWidth - rightPad;
+  const icon = getButtonIcon(state?.gamepad, 'menu');
+  const hintMetrics = ctx.measureText(hint);
+  const hintAscent = hintMetrics.actualBoundingBoxAscent || 12;
+  const hintDescent = hintMetrics.actualBoundingBoxDescent || 4;
+  const hintCenterY = hintBaselineY + (hintDescent - hintAscent) / 2;
+  const xboxOpticalOffset = state?.gamepad?.profile?.profile === 'xbox' ? -1 : 0;
+  const iconY = Math.round(hintCenterY - iconSize / 2 + xboxOpticalOffset);
+
+  if (icon) {
+    ctx.drawImage(icon, textX - gap - iconSize, iconY, iconSize, iconSize);
+  } else {
+    const fallback = state?.gamepad?.profile?.menu || 'Options';
+    const fallbackWidth = ctx.measureText(fallback).width;
+    ctx.fillText(fallback, textX - gap - fallbackWidth, hintBaselineY);
+  }
+
+  ctx.fillText(hint, textX, hintBaselineY);
 }
 
 export function createGraphics() {

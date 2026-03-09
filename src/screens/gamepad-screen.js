@@ -1,4 +1,5 @@
 import { UiTokens } from './ui-tokens.js';
+import { getButtonIcon } from '../button-icons.js';
 
 export function renderGamepadScreen(ctx, layout, state) {
   const { panelX, panelY, panelW, panelH } = layout;
@@ -16,7 +17,20 @@ export function renderGamepadScreen(ctx, layout, state) {
 
   ctx.font = UiTokens.body;
   ctx.fillStyle = UiTokens.muted;
-  ctx.fillText('Use Left/Right (or D-Pad Up/Down) to choose. Press primary action to activate.', x, y);
+  const prefix = 'Use Left/Right (or D-Pad Up/Down) to choose. Press';
+  ctx.fillText(prefix, x, y);
+
+  const primaryIcon = getButtonIcon(state.gamepad, 'primary');
+  if (primaryIcon) {
+    const prefixW = ctx.measureText(prefix).width;
+    const iconSize = 20;
+    const iconX = x + prefixW + 8;
+    const iconY = y - 15;
+    ctx.drawImage(primaryIcon, iconX, iconY, iconSize, iconSize);
+    ctx.fillText('to activate.', iconX + iconSize + 8, y);
+  } else {
+    ctx.fillText('primary action to activate.', x + ctx.measureText(prefix).width + 8, y);
+  }
   y += 34;
 
   const devices = state.gamepad.availableDevices || [];

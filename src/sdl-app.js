@@ -36,6 +36,89 @@ const SCREEN_GAMEPAD = 'gamepad';
 const useMock = process.argv.includes('--mock');
 const debugControls = process.argv.includes('--debug-controls') || process.argv.includes('--debug');
 
+function readArgValue(name) {
+  const key = `--${name}`;
+  const eqPrefix = `${key}=`;
+  for (let i = 0; i < process.argv.length; i += 1) {
+    const token = process.argv[i];
+    if (token === key) {
+      const next = process.argv[i + 1];
+      if (!next || String(next).startsWith('--')) return null;
+      return String(next);
+    }
+    if (String(token).startsWith(eqPrefix)) {
+      return String(token).slice(eqPrefix.length);
+    }
+  }
+  return null;
+}
+
+function normalizeMockProfile(value) {
+  const v = String(value || '').toLowerCase().trim();
+  if (v === 'playstation' || v === 'ps' || v === 'ps5' || v === 'dualsense') return 'dualsense';
+  if (v === 'ps4' || v === 'dualshock') return 'dualshock';
+  return 'xbox';
+}
+
+const mockControllerProfile = normalizeMockProfile(readArgValue('mock-controller-profile'));
+const mockLabels = mockProfileLabels(mockControllerProfile);
+if (useMock) {
+  console.log(
+    `[mock] controller profile=${mockControllerProfile} -> ${mockLabels.mockName} (primary=${mockLabels.primary})`,
+  );
+}
+
+function mockProfileLabels(profile) {
+  if (profile === 'dualsense') {
+    return {
+      profile: 'playstation',
+      primary: 'X',
+      secondary: 'Square',
+      menu: 'Options',
+      menuAlt: 'PS',
+      dpad: 'D-Pad',
+      mockName: 'Mock DualSense',
+    };
+  }
+  if (profile === 'dualshock') {
+    return {
+      profile: 'playstation',
+      primary: 'X',
+      secondary: 'Square',
+      menu: 'Options',
+      menuAlt: 'PS',
+      dpad: 'D-Pad',
+      mockName: 'Mock DualShock 4',
+    };
+  }
+  return {
+    profile: 'xbox',
+    primary: 'A',
+    secondary: 'X',
+    menu: 'Menu',
+    menuAlt: 'Xbox',
+    dpad: 'D-Pad',
+    mockName: 'Mock Xbox Controller',
+  };
+}
+
+function applyMockProfileToGamepadState(nextState) {
+  if (!useMock) return nextState;
+  const labels = mockProfileLabels(mockControllerProfile);
+  return {
+    ...nextState,
+    name: labels.mockName,
+    profile: {
+      profile: labels.profile,
+      primary: labels.primary,
+      secondary: labels.secondary,
+      menu: labels.menu,
+      menuAlt: labels.menuAlt,
+      dpad: labels.dpad,
+    },
+  };
+}
+
 const graphics = createGraphics();
 const porsche = useMock
   ? createMockConnection({ timeoutSeconds: CONNECTION_TIMEOUT_SECONDS })
@@ -61,7 +144,7 @@ const triggerRange = {
 const appState = {
   gamepad: {
     connected: false,
-    name: null,
+    name: useMock ? mockLabels.mockName : null,
     type: null,
     lastButton: null,
     leftStickX: 0,
@@ -76,12 +159,12 @@ const appState = {
     selectedDeviceIndex: 0,
     activeDeviceIndex: null,
     profile: {
-      profile: 'xbox',
-      primary: 'A',
-      secondary: 'X',
-      menu: 'Menu',
-      menuAlt: 'Xbox',
-      dpad: 'D-Pad',
+      profile: mockLabels.profile,
+      primary: mockLabels.primary,
+      secondary: mockLabels.secondary,
+      menu: mockLabels.menu,
+      menuAlt: mockLabels.menuAlt,
+      dpad: mockLabels.dpad,
     },
   },
   hub: {
@@ -506,7 +589,8 @@ const gamepadMonitor = createGamepadMonitor(sdl, {
   onParkingToggle: () => {
     toggleParkingMode();
   },
-  onChange: (next) => {
+  onChange: (nextRaw) => {
+    const next = applyMockProfileToGamepadState(nextRaw);
     if (Number(next.leftTrigger) < -0.05) triggerMode.leftIsSigned = true;
     if (Number(next.rightTrigger) < -0.05) triggerMode.rightIsSigned = true;
 

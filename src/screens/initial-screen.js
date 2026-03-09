@@ -1,4 +1,5 @@
 import { UiTokens } from './ui-tokens.js';
+import { getButtonIcon } from '../button-icons.js';
 
 function roundedRectPath(ctx, x, y, w, h, r) {
   const radius = Math.max(0, Math.min(r, Math.min(w, h) / 2));
@@ -126,11 +127,35 @@ export function renderInitialScreen(ctx, layout, state) {
 
     ctx.fillStyle = UiTokens.text;
     ctx.font = 'bold 20px Menlo';
-    ctx.fillText('Press X to connect', centerX, y);
+    const prefix = 'Press';
+    const suffix = 'to connect';
+    const icon = getButtonIcon(state.gamepad, 'primary');
+
+    if (icon) {
+      const iconSize = 24;
+      const gap = 8;
+      const prefixW = ctx.measureText(prefix).width;
+      const suffixW = ctx.measureText(suffix).width;
+      const totalW = prefixW + gap + iconSize + gap + suffixW;
+      let textX = centerX - totalW / 2;
+      ctx.fillText(prefix, textX + prefixW / 2, y);
+      textX += prefixW + gap;
+      ctx.drawImage(icon, textX, y - 18, iconSize, iconSize);
+      textX += iconSize + gap;
+      ctx.fillText(suffix, textX + suffixW / 2, y);
+    } else {
+      const primaryLabel = state?.gamepad?.profile?.primary || 'X';
+      ctx.fillText(`Press ${primaryLabel} to connect`, centerX, y);
+    }
   }
 
   ctx.fillStyle = UiTokens.muted;
   ctx.font = '13px Menlo';
+  if (state?.ui?.mockMode) {
+    const mockProfile = state?.gamepad?.name || state?.gamepad?.profile?.profile || 'mock';
+    const mockPrimary = state?.gamepad?.profile?.primary || '?';
+    ctx.fillText(`Mock profile: ${mockProfile} (primary: ${mockPrimary})`, centerX, cardY + cardH - 36);
+  }
   ctx.fillText(
     'You may need to pair LEGO Porsche in Bluetooth settings before connecting in the app.',
     centerX,
