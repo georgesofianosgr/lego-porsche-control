@@ -20,6 +20,8 @@ export function renderDriveScreen(ctx, layout, state) {
   y += 30;
   ctx.fillText(`Selected speed: ${state.control.selectedSpeed}%`, x, y);
   y += 30;
+  ctx.fillText(`Light mode: ${state.control.lightModeLabel} (0x${Number(state.control.lights).toString(16)})`, x, y);
+  y += 30;
   ctx.fillText(`Command speed: ${state.control.speed}`, x, y);
   y += 30;
   ctx.fillText(`Command angle: ${state.control.angle}`, x, y);

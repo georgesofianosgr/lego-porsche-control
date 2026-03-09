@@ -3,6 +3,7 @@ export function renderMenuScreen(ctx, layout, state) {
   const items = [
     'Disconnect',
     'Choose Gamepad',
+    `Lights: ${state.control.lightModeLabel}`,
     `Toggle Fullscreen (${state.ui.isFullscreen ? 'On' : 'Off'})`,
     'Exit',
   ];

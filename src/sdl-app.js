@@ -7,12 +7,12 @@ import { registerKeyboard } from './sdl-keyboard.js';
 import { createGamepadMonitor } from './sdl-gamepad.js';
 import { createPorscheConnection } from './porsche-connection.js';
 import { createMockConnection } from './mocks/mock-connection.js';
+import { LightMode } from './constants.js';
 
 const REFRESH_MS = 100;
 const CONTROL_MS = 50;
 const CONNECTION_TIMEOUT_SECONDS = 15;
 const STEER_MAX = 100;
-const LIGHTS_ON = 0x00;
 const TRIGGER_DEADZONE = 0.06;
 const STICK_CENTER_DEADZONE = 0.08;
 const STICK_OUTER_THRESHOLD = 0.9;
@@ -22,6 +22,11 @@ const SPEED_MIN = 0;
 const SPEED_MAX = 100;
 const KEYBOARD_ANGLE = 70;
 const DRIVE_HEARTBEAT_MS = 180;
+const LIGHT_MODES = [
+  { value: LightMode.ON, label: 'On' }, // 0x00
+  { value: LightMode.OFF, label: 'Off' }, // 0x04
+  { value: LightMode.BRAKE_ONLY, label: 'Brake Only' }, // 0x05
+];
 
 const SCREEN_INITIAL = 'initial';
 const SCREEN_DRIVE = 'drive';
@@ -89,7 +94,8 @@ const appState = {
   control: {
     speed: 0,
     angle: 0,
-    lights: LIGHTS_ON,
+    lights: LIGHT_MODES[0].value,
+    lightModeLabel: LIGHT_MODES[0].label,
     selectedSpeed: DEFAULT_SPEED,
   },
   keyboard: {
@@ -201,7 +207,7 @@ function computeDriveFromGamepad(gamepad) {
   const command = {
     speed: Math.round(throttle * 100 * speedScale),
     angle: Math.round(steer * STEER_MAX),
-    lights: LIGHTS_ON,
+    lights: appState.control.lights,
   };
 
   const debug = {
@@ -241,7 +247,7 @@ function computeDriveFromKeyboard(keyboard) {
   if (keyboard.a && !keyboard.d) angle = -KEYBOARD_ANGLE;
   if (keyboard.d && !keyboard.a) angle = KEYBOARD_ANGLE;
 
-  return { speed, angle, lights: LIGHTS_ON };
+  return { speed, angle, lights: appState.control.lights };
 }
 
 function debugControlLog(payload) {
@@ -295,9 +301,17 @@ async function retryConnect() {
 }
 
 async function disconnectPorsche() {
-  await porsche.stop({ lights: LIGHTS_ON });
+  await porsche.stop({ lights: appState.control.lights });
   await porsche.disconnect();
   appState.hub = porsche.getState();
+}
+
+function cycleLightMode() {
+  const currentIndex = LIGHT_MODES.findIndex((mode) => mode.value === appState.control.lights);
+  const nextIndex = currentIndex >= 0 ? (currentIndex + 1) % LIGHT_MODES.length : 0;
+  const next = LIGHT_MODES[nextIndex];
+  appState.control.lights = next.value;
+  appState.control.lightModeLabel = next.label;
 }
 
 async function runMenuSelection() {
@@ -313,10 +327,14 @@ async function runMenuSelection() {
     return;
   }
   if (appState.ui.menuIndex === 2) {
-    toggleFullscreen();
+    cycleLightMode();
     return;
   }
   if (appState.ui.menuIndex === 3) {
+    toggleFullscreen();
+    return;
+  }
+  if (appState.ui.menuIndex === 4) {
     await exit();
   }
 }
@@ -367,7 +385,7 @@ function onSecondaryAction() {
 
 function onMenuUp() {
   if (appState.ui.screen === SCREEN_MENU) {
-    appState.ui.menuIndex = appState.ui.menuIndex > 0 ? appState.ui.menuIndex - 1 : 3;
+    appState.ui.menuIndex = appState.ui.menuIndex > 0 ? appState.ui.menuIndex - 1 : 4;
     return;
   }
   if (appState.ui.screen === SCREEN_GAMEPAD) {
@@ -377,7 +395,7 @@ function onMenuUp() {
 
 function onMenuDown() {
   if (appState.ui.screen === SCREEN_MENU) {
-    appState.ui.menuIndex = appState.ui.menuIndex < 3 ? appState.ui.menuIndex + 1 : 0;
+    appState.ui.menuIndex = appState.ui.menuIndex < 4 ? appState.ui.menuIndex + 1 : 0;
     return;
   }
   if (appState.ui.screen === SCREEN_GAMEPAD) {
@@ -392,7 +410,7 @@ async function exit() {
   if (controlInterval) clearInterval(controlInterval);
 
   try {
-    await porsche.stop({ lights: LIGHTS_ON });
+    await porsche.stop({ lights: appState.control.lights });
     await porsche.disconnect();
   } finally {
     cleanupKeyboard();
@@ -491,7 +509,7 @@ controlInterval = setInterval(() => {
   if (exiting) return;
   if (appState.hub.status !== 'Connected') return;
 
-  let next = { speed: 0, angle: 0, lights: LIGHTS_ON };
+  let next = { speed: 0, angle: 0, lights: appState.control.lights };
   let controlDebug = null;
   if (appState.ui.screen === SCREEN_DRIVE) {
     if (hasKeyboardDriveInput(appState.keyboard)) {
@@ -512,7 +530,11 @@ controlInterval = setInterval(() => {
     }
   }
 
-  appState.control = { ...next, selectedSpeed: appState.control.selectedSpeed };
+  appState.control = {
+    ...next,
+    selectedSpeed: appState.control.selectedSpeed,
+    lightModeLabel: appState.control.lightModeLabel,
+  };
 
   if (
     next.speed === lastSent.speed &&
