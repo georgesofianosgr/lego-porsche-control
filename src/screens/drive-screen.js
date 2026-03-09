@@ -1,13 +1,34 @@
+import { drawBatteryGraphic } from './battery-graphic.js';
+import { drawSpeedometerGraphic } from './speedometer-graphic.js';
+
+let animatedSpeed = 0;
+let lastAnimationAt = Date.now();
+
 function connectionColor(status) {
   if (status === 'Connected') return '#22c55e';
   if (status === 'Connecting') return '#f59e0b';
   return '#ef4444';
 }
 
-function speedColor(speed) {
-  if (speed > 0) return '#22c55e';
-  if (speed < 0) return '#ef4444';
-  return '#94a3b8';
+function getAnimatedSpeed(targetSpeed) {
+  const target = Number(targetSpeed) || 0;
+  const now = Date.now();
+  const deltaMs = Math.max(1, now - lastAnimationAt);
+  lastAnimationAt = now;
+
+  const diff = target - animatedSpeed;
+  if (Math.abs(diff) < 0.01) {
+    animatedSpeed = target;
+    return animatedSpeed;
+  }
+
+  const distance = Math.min(1, Math.abs(diff) / 100);
+  const baseEase = 0.16 + distance * 0.18;
+  const frameScale = deltaMs / 16.67;
+  const easedStep = 1 - Math.pow(1 - baseEase, frameScale);
+
+  animatedSpeed += diff * easedStep;
+  return animatedSpeed;
 }
 
 function drawStatusStrip(ctx, panelX, panelY, panelW, state) {
@@ -40,32 +61,12 @@ function drawStatusStrip(ctx, panelX, panelY, panelW, state) {
   ctx.stroke();
 }
 
-function drawCenterSpeed(ctx, centerX, centerY, state) {
-  const speed = Number(state.control.speed || 0);
-  const speedText = String(Math.abs(speed));
-
-  ctx.fillStyle = '#94a3b8';
-  ctx.font = '16px Menlo';
-  ctx.textAlign = 'center';
-  ctx.fillText('SPEED', centerX, centerY - 110);
-
-  ctx.fillStyle = speedColor(speed);
-  ctx.font = 'bold 132px Menlo';
-  ctx.fillText(speedText, centerX, centerY);
-
-  ctx.fillStyle = '#94a3b8';
-  ctx.font = '16px Menlo';
-  ctx.fillText('(-100 .. 100)', centerX, centerY + 24);
-
-  ctx.textAlign = 'left';
-}
-
 function drawSteeringWidget(ctx, centerX, centerY, state) {
   const angle = Number(state.control.angle || 0);
   const barW = 440;
   const barH = 20;
   const barX = centerX - barW / 2;
-  const barY = centerY + 64;
+  const barY = centerY + 190;
 
   ctx.fillStyle = '#94a3b8';
   ctx.font = '14px Menlo';
@@ -105,8 +106,9 @@ function drawBottomCards(ctx, panelX, panelY, panelW, panelH, state) {
   const firstX = panelX + margin;
   const secondX = firstX + cardW + spacing;
   const thirdX = secondX + cardW + spacing;
-  const batteryText =
-    typeof state.hub.batteryPercent === 'number' ? `${state.hub.batteryPercent}%` : '--';
+  const batteryPercent = Number.isFinite(state.hub.batteryPercent)
+    ? Math.max(0, Math.min(100, Number(state.hub.batteryPercent)))
+    : null;
 
   ctx.fillStyle = '#0b1220';
   ctx.fillRect(firstX, cardY, cardW, cardH);
@@ -116,14 +118,20 @@ function drawBottomCards(ctx, panelX, panelY, panelW, panelH, state) {
   ctx.fillStyle = '#94a3b8';
   ctx.font = '13px Menlo';
   ctx.fillText('LIGHT MODE', firstX + 14, cardY + 24);
-  ctx.fillText('SELECTED SPEED', secondX + 14, cardY + 24);
-  ctx.fillText('BATTERY', thirdX + 14, cardY + 24);
+  ctx.fillText('MAX SPEED', secondX + 14, cardY + 24);
+  ctx.fillText('BATTERY', thirdX + 14, cardY + 20);
 
   ctx.fillStyle = '#e5e7eb';
   ctx.font = 'bold 24px Menlo';
   ctx.fillText(state.control.lightModeLabel, firstX + 14, cardY + 58);
   ctx.fillText(`${state.control.selectedSpeed}%`, secondX + 14, cardY + 58);
-  ctx.fillText(batteryText, thirdX + 14, cardY + 58);
+  drawBatteryGraphic(ctx, {
+    x: thirdX + 14,
+    y: cardY + 34,
+    width: cardW - 30,
+    height: 34,
+    percent: batteryPercent,
+  });
 }
 
 function drawDebugPanel(ctx, panelX, panelY, panelW, panelH, state) {
@@ -174,8 +182,16 @@ export function renderDriveScreen(ctx, layout, state) {
   drawStatusStrip(ctx, panelX, panelY, panelW, state);
 
   const centerX = panelX + panelW * 0.5;
-  const centerY = panelY + panelH * 0.43;
-  drawCenterSpeed(ctx, centerX, centerY, state);
+  const centerY = panelY + panelH * 0.42;
+  const displaySpeed = getAnimatedSpeed(state.control.speed);
+  drawSpeedometerGraphic(ctx, {
+    centerX,
+    centerY,
+    radius: 165,
+    speed: displaySpeed,
+    maxSpeed: 100,
+    reverse: Number(displaySpeed || 0) < 0,
+  });
   drawSteeringWidget(ctx, centerX, centerY, state);
   drawBottomCards(ctx, panelX, panelY, panelW, panelH, state);
   drawDebugPanel(ctx, panelX, panelY, panelW, panelH, state);
