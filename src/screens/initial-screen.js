@@ -31,6 +31,38 @@ function drawStatusPill(ctx, text, x, y, color) {
   ctx.fillText(text, x, y + 5);
 }
 
+function drawCheckeredFlagBackground(ctx, panelX, panelY, panelW, panelH) {
+  const tile = 52;
+  const cols = Math.ceil(panelW / tile) + 2;
+  const rows = Math.ceil(panelH / tile) + 2;
+
+  ctx.save();
+  ctx.translate(panelX, panelY);
+  ctx.beginPath();
+  ctx.rect(0, 0, panelW, panelH);
+  ctx.clip();
+  ctx.fillStyle = '#0b1020';
+  ctx.fillRect(0, 0, panelW, panelH);
+
+  ctx.globalAlpha = 0.3;
+  for (let row = 0; row < rows; row += 1) {
+    for (let col = 0; col < cols; col += 1) {
+      const isDark = (row + col) % 2 === 0;
+      ctx.fillStyle = isDark ? '#f8fafc' : '#111827';
+      ctx.fillRect(col * tile - tile, row * tile - tile, tile, tile);
+    }
+  }
+
+  ctx.globalAlpha = 1;
+  const vignette = ctx.createLinearGradient(0, 0, panelW, panelH);
+  vignette.addColorStop(0, 'rgba(2,6,23,0.6)');
+  vignette.addColorStop(0.5, 'rgba(2,6,23,0.28)');
+  vignette.addColorStop(1, 'rgba(2,6,23,0.72)');
+  ctx.fillStyle = vignette;
+  ctx.fillRect(0, 0, panelW, panelH);
+  ctx.restore();
+}
+
 export function renderInitialScreen(ctx, layout, state) {
   const { panelX, panelY, panelW, panelH } = layout;
   const hub = state.hub;
@@ -38,20 +70,7 @@ export function renderInitialScreen(ctx, layout, state) {
   const centerX = panelX + panelW / 2;
   const centerY = panelY + panelH / 2;
 
-  ctx.fillStyle = UiTokens.panel;
-  ctx.fillRect(panelX, panelY, panelW, panelH);
-
-  const glowTop = ctx.createRadialGradient(centerX, panelY + 110, 10, centerX, panelY + 110, panelW * 0.5);
-  glowTop.addColorStop(0, 'rgba(34,197,94,0.18)');
-  glowTop.addColorStop(1, 'rgba(34,197,94,0)');
-  ctx.fillStyle = glowTop;
-  ctx.fillRect(panelX, panelY, panelW, panelH * 0.6);
-
-  const glowBottom = ctx.createRadialGradient(centerX, panelY + panelH + 20, 40, centerX, panelY + panelH, panelW);
-  glowBottom.addColorStop(0, 'rgba(56,189,248,0.14)');
-  glowBottom.addColorStop(1, 'rgba(56,189,248,0)');
-  ctx.fillStyle = glowBottom;
-  ctx.fillRect(panelX, panelY + panelH * 0.35, panelW, panelH * 0.65);
+  drawCheckeredFlagBackground(ctx, panelX, panelY, panelW, panelH);
 
   const cardW = Math.min(720, panelW - 80);
   const cardH = Math.min(360, panelH - 80);
